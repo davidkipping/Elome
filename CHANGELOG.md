@@ -6,6 +6,13 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+### Added
+- The name in the docs: the README title also shows Elómë in Tengwar
+  (Quenya mode; SVG outlines in light and dark versions, rendered with the
+  OFL font Alcarin Tengwar -- `docs/assets/`, with the script that made
+  them), followed by the etymology and the pronunciation, /ɛˈloː.mɛ/,
+  "eh-LOH-meh"; the package docstring carries both too.
+
 ## [0.14.0] — 2026-10-11
 
 ### Changed

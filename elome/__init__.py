@@ -1,6 +1,11 @@
 """Elómë — analytic, differentiable transit light curves on Apple
 Silicon (MLX).
 
+The name is Quenya: él "star" + lómë "dusk, dimness" -- a star dimmed,
+which is what a transit is. Pronounced /ɛˈloː.mɛ/, "eh-LOH-meh", stressed
+on the long ó, the final ë spoken. Formerly MetalPlanet (``import
+metalplanet`` is a deprecated alias).
+
 Quadratic limb-darkened transits per Agol, Luger & Foreman-Mackey (2020),
 with a batman-style frontend for everyday use:
 

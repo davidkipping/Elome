@@ -1,9 +1,28 @@
-# Elómë
+# Elómë &nbsp;<picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/elome_tengwar_dark.svg"><img src="docs/assets/elome_tengwar_light.svg" alt="Elómë in Tengwar" height="44" align="top"></picture>
 
-*Elómë* (Quenya: *Él* "star" + *lómë* "dimness") -- a star dimmed by a
-passing planet. Formerly **MetalPlanet**: the package is `elome`
-(`pip install -e .`, `import elome`), and `import metalplanet` still works
-for now, with a deprecation warning.
+**The name.** *Elómë* is Quenya, the High-Elven tongue of Tolkien's
+legendarium: *él* "star" + *lómë* "dusk, dimness" -- a star dimmed, which
+is what a transit is. Tolkien derived *él* (and *elen*, as in *Elen síla*)
+from *ele* "behold!", the Elves' first cry on seeing the stars; *lómë* is
+the dusk of *Lómion*, "son of the twilight". The title's second form is
+the name in Tengwar, Tolkien's Elvish script, in the Quenya mode
+([how it was made](docs/assets/README.md)).
+
+**Pronunciation:** /ɛˈloː.mɛ/, "eh-**LOH**-meh", in three syllables,
+*e-ló-më*.
+
+- **Stress falls on *ló*.** Quenya stresses the second-to-last syllable when
+  its vowel is long, and the accent on *ó* marks it long (Tolkien's
+  accents mark length, not stress).
+- ***ó* is a pure, held "o"**, as in Italian or Spanish, not the English
+  glide "oh-w".
+- **The final *ë* is spoken**, a short "eh". The diaeresis only says it is
+  not silent, as in *Manwë*.
+- **Both *e*s are short, open "e"s**, as in "bet".
+
+Formerly **MetalPlanet**. The package is `elome` (`pip install -e .`,
+`import elome`), and `import metalplanet` still works for now, with a
+deprecation warning.
 
 Analytic, differentiable exoplanet transit light curves on Apple Silicon,
 built on [MLX](https://github.com/ml-explore/mlx) — the
