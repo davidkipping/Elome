@@ -202,6 +202,15 @@ with mx.stream(mx.cpu):
   `mx.array(x, dtype=mx.float32)`: a numpy float64 array is not silently
   demoted (MLX's own `mx.array()` would). The data may be passed
   positionally or by name.
+- MLX's float64 is not float64 for every op. `mx.sin`, `mx.cos`,
+  `mx.exp` and `mx.erf` are float32-accurate even in float64 on the CPU
+  stream (1e-7 to 1e-5 relative, MLX 0.32), while `log`, `sqrt`,
+  `arctan2`, `arccos` and arithmetic are true float64. Elómë's own trig
+  goes through `elome.trig.sincos` (Cody-Waite reduction, ~1e-16), so
+  its float64 results are unaffected; but geometry you compute in MLX
+  before the call -- a/R* from T14 through sin(pi T14 / P), say --
+  carries the error into a "float64" light curve. Do that preprocessing
+  in numpy or `math`, or with `elome.trig.sincos`.
 - Parameters: the kernel entry points (`flux_dev_from_tau`,
   `flux_dev_metal`) cast a parameter array of another dtype to the
   data's and take one parameter value per row of (n, m) data. The graph

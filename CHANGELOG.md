@@ -6,6 +6,12 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+### Documentation
+- README: MLX's float64 `sin`, `cos`, `exp` and `erf` are only
+  float32-accurate. Elómë's own results are unaffected, since it uses
+  `elome.trig.sincos`. A caller's MLX preprocessing, though, can carry the
+  error into a float64 light curve (reported by SquishierPlanet).
+
 ## [0.15.0] — 2026-10-11
 
 ### Changed
