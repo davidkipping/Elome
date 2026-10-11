@@ -16,7 +16,7 @@ import pytest
 
 import elome as el
 from elome import oblate_tau as OT
-from elome.hybrid import hybrid_norms
+from elome.hybrid import hybrid_norms, w_to_c
 from elome.metal import _ecc_shape
 
 _SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
@@ -104,6 +104,14 @@ def test_sky_derivatives():
 # light curves against SquishierPlanet
 # ---------------------------------------------------------------------------
 
+
+def _sp_law(law):
+    """Elómë's law definition as a squishierplanet Law (its own poles, so
+    the comparison holds whatever poles that checkout ships)."""
+    L = el.HYBRID_LAWS[law]
+    return spl.Law(*w_to_c(L, W[law]), L.eps)
+
+
 @needs_sp
 @pytest.mark.parametrize("law", ["hybrid2", "hybrid4", "hybrid5"])
 @pytest.mark.parametrize("r,f,theta,b,e,w", [
@@ -115,8 +123,6 @@ def test_sky_derivatives():
     (0.08, 0.2, 0.3, 0.2, 0.6, -2.0),
 ])
 def test_light_curve_matches_squishierplanet(law, r, f, theta, b, e, w):
-    if law == "hybrid2" and float(spl.HYBRID2_EPS) != el.HYBRID2_EPS:
-        pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not Elómë's")
     kw = dict(f=f, theta=theta, integration="none")
     inc = math.acos(b / A_RS)
     if e > 0:
@@ -124,7 +130,7 @@ def test_light_curve_matches_squishierplanet(law, r, f, theta, b, e, w):
         kw.update(secosw=k, sesinw=h)
         inc = math.acos(cos_i(b, k, h))
     got = flux(TAU, b, r, law, **kw)
-    ref = sp_light_curve(TAU, spl.hybrid(law, W[law]), r_eff=r, f=f,
+    ref = sp_light_curve(TAU, _sp_law(law), r_eff=r, f=f,
                          theta=theta, period=P, a=A_RS, i=inc, t0=0.0, e=e,
                          omega=w if e > 0 else np.pi / 2) - 1.0
     assert ref.min() < -1e-4                       # a transit is tested

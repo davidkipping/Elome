@@ -6,6 +6,20 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-10-11
+
+### Changed
+- **hybrid4's poles move to LDhybrid v1.0's tuned ladder**: the analytic
+  ladder with alpha_eff = 25/16 (ln eps scaled by 0.8), eps = 0.0286,
+  0.3858 (was alpha_eff = 1: 0.0118, 0.304). Over 8,100 model-passband
+  combinations outside LDhybrid's pole study the median light-curve error
+  falls from 5.8 to 1.8 ppm (Claret four-parameter 2.0, hybrid5 1.1), as
+  good as the free two-pole optimum; the free-coefficient depth bias falls
+  from 34 to 12 ppm (max, PHOENIX). hybrid4 light curves change; weights fitted
+  with the old poles, or LDhybrid tables before v1.0's change, do not
+  carry over. hybrid2 and hybrid5 are unchanged. New constants
+  `HYBRID4_ALPHA`, `HYBRID4_EPS` (also exported from `elome`).
+
 ### Added
 - The name in the docs: the README title also shows Elómë in Tengwar
   (Quenya mode; SVG outlines in light and dark versions, rendered with the

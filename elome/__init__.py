@@ -28,7 +28,7 @@ from .kepler import (kepler, kepler_E, kepler_E_sincos,
                      separation_keplerian)
 from .anchored import anchor_constants, separation_anchored
 from .poly import flux_dev_poly, sn_dev_poly
-from .hybrid import (HYBRID2, HYBRID2_EPS, HYBRID4,
+from .hybrid import (HYBRID2, HYBRID2_EPS, HYBRID4, HYBRID4_EPS,
                      HYBRID5, HybridLaw, LAWS as HYBRID_LAWS,
                      flux_dev_hybrid, hybrid_norms, shape_cols)
 from .oblate import flux_dev_oblate, shape_cols_oblate
@@ -68,6 +68,7 @@ __all__ = [
     "HybridLaw",
     "HYBRID2",
     "HYBRID2_EPS",
+    "HYBRID4_EPS",
     "flux_dev_oblate",
     "shape_cols_oblate",
     "contact_offsets_oblate",
@@ -87,4 +88,4 @@ __all__ = [
     "sn_dev_with_aux",
 ]
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"

@@ -126,8 +126,9 @@ md(r"""
 The quadratic law is the default, but Elómë also has three **hybrid
 laws** (from SquishierPlanet): even powers of $\mu$ plus "double-pole"
 terms $(\mu^2+\epsilon)^{-2}$ that follow a real star's steep fall at the
-limb. On simulated M-G dwarfs `hybrid4` is 15-20x more accurate than the
-quadratic law, and `hybrid5` ties Claret's four-parameter law.
+limb. Across PHOENIX and MPS-ATLAS stellar models in 37 passbands the
+median light-curve error is 1.8 ppm for `hybrid4` and 1.1 ppm for
+`hybrid5`, against 2.0 ppm for Claret's four-parameter law.
 
 Their coefficients `u` are **shape weights**: each is the share of the
 centre-to-limb drop its term carries, so $I(0)/I(1) = 1 - \sum w$, and

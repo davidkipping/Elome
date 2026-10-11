@@ -65,12 +65,16 @@ def phys_w(law, seed):
     return _phys_w(law, np.random.default_rng(seed))
 
 
-def sp_same_hybrid2():
-    """Does the SquishierPlanet checkout carry Elómë's hybrid2 pole?
-    (Its hybrid2 is then the same law; a checkout with another pole cannot
-    be compared on hybrid2.)"""
+def sp_same(name):
+    """Does the SquishierPlanet checkout carry Elómë's poles for this law?
+    (Its law is then the same; a checkout with other poles cannot be
+    compared on it.)"""
     from squishierplanet import laws as spl
-    return float(spl.HYBRID2_EPS) == H.HYBRID2_EPS
+    if name == "hybrid2":
+        return float(spl.HYBRID2_EPS) == H.HYBRID2_EPS
+    law = LAWS[name]
+    ref = spl.hybrid(name, np.ones(law.n_w)).eps
+    return np.allclose(np.sort(ref), sorted(law.eps), rtol=1e-12)
 
 
 def z_grid(r, law=None):
@@ -136,6 +140,13 @@ class TestDefinitions:
         assert np.allclose(ladder(2), [0.01176, 0.3041], rtol=1e-3)
         assert np.allclose(ladder(3), [0.001597, 0.04128, 0.3874], rtol=1e-3)
         assert HYBRID2.eps == (0.36,)
+        # hybrid4: LDhybrid v1.0's alpha = 25/16 ladder (its v1.py guard)
+        assert H.HYBRID4_ALPHA == 25.0 / 16.0
+        assert HYBRID4.eps == ladder(2, 25.0 / 16.0) == H.HYBRID4_EPS
+        assert np.allclose(HYBRID4.eps, (0.02860121, 0.38582418), rtol=1e-6)
+        assert np.allclose(np.log(HYBRID4.eps), 0.8 * np.log(ladder(2)),
+                           rtol=1e-14)
+        assert HYBRID5.eps == ladder(3)
         assert (HYBRID2.n_w, HYBRID4.n_w, HYBRID5.n_w) == (2, 4, 5)
 
     @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
@@ -147,12 +158,28 @@ class TestDefinitions:
         assert H.HYBRID2_EPS == float(spl.HYBRID2_EPS)
 
     @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
+    def test_hybrid4_poles_match_squishierplanet(self):
+        """Likewise hybrid4 (LDhybrid v1.0's alpha = 25/16 ladder): a
+        SquishierPlanet checkout on other poles fails here instead of the
+        cross-checks below quietly skipping hybrid4. A checkout still on the
+        alpha = 1 ladder has not yet adopted the change (LDhybrid's note
+        docs/upstream/hybrid4_ladder_alpha.md) and is skipped, not failed."""
+        from squishierplanet import laws as spl
+        old = np.sort(spl.hybrid("hybrid4", np.ones(4)).eps)
+        if np.allclose(old, ladder(2), rtol=1e-12):
+            pytest.skip("this SquishierPlanet checkout predates hybrid4's "
+                        "alpha = 25/16 ladder")
+        assert sp_same("hybrid4"), (
+            "SquishierPlanet's hybrid4 poles are not Elómë's "
+            f"{H.HYBRID4_EPS} (ladder(2, alpha_eff=25/16))")
+
+    @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
     def test_matches_squishierplanet_definitions(self):
         from squishierplanet import laws as spl
         assert np.allclose(ladder(2), spl.ladder(2), rtol=1e-15)
         assert np.allclose(ladder(3), spl.ladder(3), rtol=1e-15)
         for name in NAMES:
-            if name == "hybrid2" and not sp_same_hybrid2():
+            if not sp_same(name):
                 continue
             law = LAWS[name]
             w = phys_w(law, 1)
@@ -237,8 +264,8 @@ class TestColumns:
         assert np.array_equal(np.asarray(E1), np.asarray(B)[:, 2])
 
     @pytest.mark.parametrize("r", RS)
-    @pytest.mark.parametrize("eps", sorted(set(ladder(3) + ladder(2)
-                                               + (H.HYBRID2_EPS,))))
+    @pytest.mark.parametrize("eps", sorted({e for law in LAWS.values()
+                                            for e in law.eps}))
     def test_pole_column_vs_oracle(self, r, eps):
         law = H.HybridLaw("one", (eps,), ())
         zs = z_grid(r, law)
@@ -305,7 +332,7 @@ class TestColumns:
         Every pole, 1e-13 .. 1e-6 from the contact, against the oracle."""
         from elome.metal import metal_available
         from elome.metal_hybrid import flux_dev_metal_hybrid
-        eps_all = sorted(set(ladder(3) + ladder(2) + (H.HYBRID2_EPS,)))
+        eps_all = sorted({e for law in LAWS.values() for e in law.eps})
         zs = [1.0 - r + d for d in (1e-13, 1e-11, 1e-9, 1e-6)]
         for e in eps_all:
             def I(x, e=e):
@@ -344,17 +371,17 @@ class TestFlux:
     @pytest.mark.parametrize("name", NAMES)
     @pytest.mark.parametrize("r", RS)
     def test_vs_squishierplanet(self, name, r):
+        """The flux machinery, on Elómë's own law definition (expanded into
+        a squishierplanet Law), so the check holds whatever poles that
+        checkout ships; the definitions are compared separately."""
         from squishierplanet import laws as spl
-        if name == "hybrid2" and not sp_same_hybrid2():
-            pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not "
-                        "Elómë's")
         law = LAWS[name]
         zs = z_grid(r, law)
         for seed in (6, 7, 8):
             w = phys_w(law, seed)
             with mx.stream(mx.cpu):
                 got = np.asarray(flux_dev_hybrid(f64(zs), f64(r), w, law))
-            L = spl.hybrid(name, w)
+            L = spl.Law(*w_to_c(law, w), law.eps)
             ref = np.array([sp.flux(L, z, 0.0, r, r) - 1.0 for z in zs])
             assert np.abs(got - ref).max() < 1e-12, (name, r, seed)
 
@@ -623,7 +650,7 @@ class TestPriors:
         """Both packages' DEFAULT hybrid2 prior (drift is reported by
         test_hybrid2_pole_matches_squishierplanet)."""
         from squishierplanet import laws as spl
-        if not sp_same_hybrid2():
+        if not sp_same("hybrid2"):
             pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not "
                         "Elómë's (see the pole test)")
         rng = np.random.default_rng(1)

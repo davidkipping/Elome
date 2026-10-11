@@ -19,7 +19,7 @@ import pytest
 
 import elome as el
 from elome import oblate as O
-from elome.hybrid import HYBRID2, HybridLaw, LAWS, hybrid_norms, shape_cols
+from elome.hybrid import HYBRID2, HybridLaw, LAWS, hybrid_norms, shape_cols, w_to_c
 
 _SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
 if _SP.is_dir() and str(_SP) not in sys.path:
@@ -160,9 +160,7 @@ def test_generators_match_squishierplanet(name, dtype):
 def test_law_light_curve_matches_squishierplanet(law):
     """flux_dev_oblate along tilted transit chords vs squishierplanet.flux,
     sky frame and theta convention included."""
-    if law == "hybrid2" and float(spl.HYBRID2_EPS) != LAWS["hybrid2"].eps[0]:
-        pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not Elómë's")
-    L = spl.hybrid(law, W[law])
+    L = spl.Law(*w_to_c(LAWS[law], W[law]), LAWS[law].eps)   # Elómë's poles
     for r, f, th, b in ((0.1, 0.1, 0.4, 0.3), (0.2, 0.3, 1.0, 0.6), (0.05, 0.5, 2.5, 0.0)):
         A, B = sp.axes_from_reff(r, f)
         X = np.linspace(-(1 + A) * 1.02, (1 + A) * 1.02, 301)

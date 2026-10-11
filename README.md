@@ -300,9 +300,11 @@ remains the default for batman parity.
 
 Three laws from SquishierPlanet built from even powers of mu plus
 "double-pole" terms 1/(mu^2 + eps)^2, which are infinite only just outside
-the star and so follow a real profile's steep fall at the limb. On
-simulated M-G dwarfs hybrid4 is 15-20x more accurate than the quadratic
-law and hybrid5 ties the Claret four-parameter law (0.6 ppm). They are
+the star and so follow a real profile's steep fall at the limb. Over
+8,100 model-passband combinations (PHOENIX and MPS-ATLAS, outside
+LDhybrid v1.0's tuning set) the median light-curve error is 1.8 ppm for
+hybrid4 and 1.1 ppm for hybrid5, against 2.0 ppm for the Claret
+four-parameter law. They are
 written in a shape basis: each coefficient w_j is the share of the
 centre-to-limb drop its term carries, so `I(0)/I(1) = 1 - sum(w)`:
 
@@ -319,12 +321,13 @@ flux = TransitModel(p, t).light_curve(p)
 | law | weights | terms | poles eps |
 |---|---|---|---|
 | hybrid2 | 2 | 1 - mu^2, Pi_eps | 0.36 |
-| hybrid4 | 4 | 1 - mu^4, (1 - mu^2)^2, Pi_eps x 2 | 0.0118, 0.304 |
+| hybrid4 | 4 | 1 - mu^4, (1 - mu^2)^2, Pi_eps x 2 | 0.0286, 0.386 |
 | hybrid5 | 5 | 1 - mu^4, (1 - mu^2)^2, Pi_eps x 3 | 0.0016, 0.0413, 0.387 |
 
 with `Pi_eps = [(mu^2 + eps)^-2 - (1 + eps)^-2] / [eps^-2 - (1 + eps)^-2]`
-and the hybrid4/5 poles on the analytic ladder `exp[2 pi (sqrt(k + 1/2)
-- sqrt K)]`. Uniform priors on the physical regions: `hybrid2_from_q`
+and the hybrid4/5 poles on the analytic ladder `exp[(2 pi / sqrt alpha)
+(sqrt(k + 1/2) - sqrt K)]`: hybrid5 at alpha = 1, hybrid4 at alpha = 25/16
+(LDhybrid v1.0's tuning; at alpha = 1 its median error is 5.8 ppm). Uniform priors on the physical regions: `hybrid2_from_q`
 (the exact triangle) and `simplex_from_q` (stick-breaking on
 `w >= 0, sum w <= 1`), MLX and numpy versions, with inverses.
 
