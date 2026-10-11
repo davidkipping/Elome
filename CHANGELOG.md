@@ -7,6 +7,10 @@ every release is tagged `vX.Y.Z` in git.
 ## [Unreleased]
 
 ### Documentation
+- anvil is public: the README links it
+  (github.com/davidkipping/anvil) and gives its install command in place
+  of "not yet public", and so do the pyproject comment and the
+  ImportError raised when it is missing.
 - README: MLX's float64 `sin`, `cos`, `exp` and `erf` are only
   float32-accurate. Elómë's own results are unaffected, since it uses
   `elome.trig.sincos`. A caller's MLX preprocessing, though, can carry the

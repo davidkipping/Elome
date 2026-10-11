@@ -84,8 +84,8 @@ dependency arrow. See [CHANGELOG.md](CHANGELOG.md) for version history
    from the same code.
 3. **Sampler-ready.** `elome.anvil` provides the batched,
    float32-conditioned model contract for the
-   anvil (formerly applemcmc) MCMC engine (not yet public; see
-   [Install](#install--test)): epoch-centered
+   [anvil](https://github.com/davidkipping/anvil) MCMC engine (formerly
+   applemcmc; see [Install](#install--test)): epoch-centered
    times, offset parameters, Kipping (2013) (q₁,q₂) limb darkening, and
    a synthetic injection-recovery target. ChEES-HMC runs with zero
    divergences on this model.
@@ -121,7 +121,9 @@ python examples/injection_recovery.py  # full GPU injection-recovery
 
 > **Note on anvil.** The MCMC engine that `elome.anvil`, the
 > sampler guide (`docs/sampler-integration.md`) and several examples and
-> benchmarks refer to is a separate package that is **not yet public**.
+> benchmarks refer to is a separate package,
+> [anvil](https://github.com/davidkipping/anvil)
+> (`pip install git+https://github.com/davidkipping/anvil`).
 > It is an optional dependency: everything else in Elómë — the
 > batman-style `TransitModel`, the Metal kernels, `flux_dev_from_tau`,
 > and the gradients — imports and runs without it. `elome.anvil`

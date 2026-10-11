@@ -14,7 +14,8 @@ dependencies = ["mlx>=0.30", "numpy"]
 [project.optional-dependencies]
 test = ["pytest", "scipy", "batman-package", "mpmath"]
 # the sampling engine (anvil, formerly applemcmc) is an optional
-# integration dependency — install it separately for elome.anvil
+# integration dependency — install it separately for elome.anvil:
+#   pip install git+https://github.com/davidkipping/anvil
 
 [tool.setuptools.packages.find]
 # elome, plus the deprecated `metalplanet` alias (a shim re-exporting it)

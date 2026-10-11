@@ -71,7 +71,8 @@ def import_engine():
     except ImportError as err:
         raise ImportError(
             "the anvil MCMC engine is not installed (looked for 'anvil' and "
-            "its former name 'applemcmc')") from err
+            "its former name 'applemcmc'); install it with "
+            "`pip install git+https://github.com/davidkipping/anvil`") from err
     return engine, ChunkedGaussianLogLike
 
 
