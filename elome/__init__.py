@@ -1,0 +1,85 @@
+"""Elómë — analytic, differentiable transit light curves on Apple
+Silicon (MLX).
+
+Quadratic limb-darkened transits per Agol, Luger & Foreman-Mackey (2020),
+with a batman-style frontend for everyday use:
+
+    import elome
+    params = elome.TransitParams()
+    ...
+    m = elome.TransitModel(params, t)
+    flux = m.light_curve(params)
+
+and a float32-conditioned batched backend (``elome.anvil``) for
+GPU sampling with the anvil (formerly applemcmc) MCMC engine — which is
+an optional integration dependency; the core needs only mlx and numpy.
+"""
+
+from .api import TransitModel, TransitParams
+from .ellip import cel, cel3
+from .flux import flux_dev, light_curve
+from .greens import greens_transform_np, quad_g_coeffs, quad_norm
+from .kepler import (kepler, kepler_E, kepler_E_sincos,
+                     separation_keplerian)
+from .anchored import anchor_constants, separation_anchored
+from .poly import flux_dev_poly, sn_dev_poly
+from .hybrid import (HYBRID2, HYBRID2_EPS, HYBRID4,
+                     HYBRID5, HybridLaw, LAWS as HYBRID_LAWS,
+                     flux_dev_hybrid, hybrid_norms, shape_cols)
+from .oblate import flux_dev_oblate, shape_cols_oblate
+from .oblate_tau import contact_offsets_oblate
+from .ld import (hybrid2_from_q, hybrid2_from_q_np, hybrid2_to_q_np,
+                 q_from_simplex_np, q_to_u, q_to_u_np, simplex_from_q,
+                 simplex_from_q_np, u_to_q_np)
+from .metal import flux_dev_from_tau, flux_dev_metal, metal_available
+from .solution import sn_dev, sn_dev_with_aux
+from .vjp import flux_dev_analytic
+
+__all__ = [
+    "TransitModel",
+    "TransitParams",
+    "cel",
+    "cel3",
+    "flux_dev",
+    "flux_dev_analytic",
+    "flux_dev_poly",
+    "sn_dev_poly",
+    "light_curve",
+    "flux_dev_from_tau",
+    "flux_dev_metal",
+    "metal_available",
+    "greens_transform_np",
+    "quad_g_coeffs",
+    "quad_norm",
+    "kepler",
+    "kepler_E",
+    "kepler_E_sincos",
+    "separation_keplerian",
+    "separation_anchored",
+    "anchor_constants",
+    "q_to_u",
+    "q_to_u_np",
+    "u_to_q_np",
+    "HybridLaw",
+    "HYBRID2",
+    "HYBRID2_EPS",
+    "flux_dev_oblate",
+    "shape_cols_oblate",
+    "contact_offsets_oblate",
+    "HYBRID4",
+    "HYBRID5",
+    "HYBRID_LAWS",
+    "flux_dev_hybrid",
+    "hybrid_norms",
+    "shape_cols",
+    "hybrid2_from_q",
+    "hybrid2_from_q_np",
+    "hybrid2_to_q_np",
+    "simplex_from_q",
+    "simplex_from_q_np",
+    "q_from_simplex_np",
+    "sn_dev",
+    "sn_dev_with_aux",
+]
+
+__version__ = "0.14.0"

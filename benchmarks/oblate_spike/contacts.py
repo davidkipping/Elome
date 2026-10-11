@@ -9,7 +9,7 @@ from squishierplanet import jaxlc, laws as L
 P, AR = 3.45, 8.8
 
 def centre(phi, b, th):
-    X, Y = AR * np.sin(phi), b * np.cos(phi)           # X along the orbit (MetalPlanet's sign)
+    X, Y = AR * np.sin(phi), b * np.cos(phi)           # X along the orbit (Elómë's sign)
     return X * np.cos(th) + Y * np.sin(th), -X * np.sin(th) + Y * np.cos(th)
 
 PSI = np.linspace(0, 2 * np.pi, 64, endpoint=False)

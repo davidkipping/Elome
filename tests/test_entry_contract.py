@@ -15,7 +15,7 @@ entry point and every form at once:
 * transforms: mx.grad (fp32 on the default stream; fp64 with the grad
   call on the CPU stream, the MLX rule), mx.compile.
 
-The contract (metalplanet/dtypes.py): float32 data stays float32 and
+The contract (elome/dtypes.py): float32 data stays float32 and
 takes the kernels on the GPU; any other data is float64 and takes the
 exact graph on the CPU stream. Kernel entry points cast parameters to the
 data's dtype; graph functions keep MLX broadcasting and promotion.
@@ -27,12 +27,12 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet as mp
-from metalplanet import metal as M
-from metalplanet import metal_hybrid as MH
-from metalplanet import metal_oblate as MO
-from metalplanet.metal import metal_available
-from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+import elome as el
+from elome import metal as M
+from elome import metal_hybrid as MH
+from elome import metal_oblate as MO
+from elome.metal import metal_available
+from elome.metal_hybrid import flux_dev_metal_hybrid
 
 KERNEL = metal_available() and M._gpu_stream_active()
 
@@ -47,26 +47,26 @@ HYB = {"limb_dark": "hybrid4", "u": W4}
 # family: the kernel dispatch point the fp32 GPU call must reach, or None
 # for a graph function.
 KERNEL_ENTRIES = {
-    "z/quad": (mp.flux_dev_metal, "z", Z, [("r", 0.1)] + QUAD, {}, "zq"),
-    "z/ld_basis": (mp.flux_dev_metal, "z", Z, [("r", 0.1)],
+    "z/quad": (el.flux_dev_metal, "z", Z, [("r", 0.1)] + QUAD, {}, "zq"),
+    "z/ld_basis": (el.flux_dev_metal, "z", Z, [("r", 0.1)],
                    {"ld_basis": True}, "zb"),
-    "z/hybrid": (mp.flux_dev_metal, "z", Z, [("r", 0.1)], HYB, "zh"),
-    "z/hybrid_basis": (mp.flux_dev_metal, "z", Z, [("r", 0.1)],
+    "z/hybrid": (el.flux_dev_metal, "z", Z, [("r", 0.1)], HYB, "zh"),
+    "z/hybrid_basis": (el.flux_dev_metal, "z", Z, [("r", 0.1)],
                        {"limb_dark": "hybrid4", "ld_basis": True}, "zh"),
     "z-hybrid-entry": (flux_dev_metal_hybrid, "z", Z,
                        [("r", 0.1), ("law", "hybrid4"), ("u", W4)], {}, "zh"),
-    "tau/quad": (mp.flux_dev_from_tau, "tau", TAU, GEO + QUAD, {}, "tq"),
-    "tau/quad_contact": (mp.flux_dev_from_tau, "tau", TAU, GEO + QUAD,
+    "tau/quad": (el.flux_dev_from_tau, "tau", TAU, GEO + QUAD, {}, "tq"),
+    "tau/quad_contact": (el.flux_dev_from_tau, "tau", TAU, GEO + QUAD,
                          {"exp_time": 0.02}, "tq"),
-    "tau/ld_basis": (mp.flux_dev_from_tau, "tau", TAU, GEO,
+    "tau/ld_basis": (el.flux_dev_from_tau, "tau", TAU, GEO,
                      {"ld_basis": True}, "tq"),
-    "tau/quad_ecc": (mp.flux_dev_from_tau, "tau", TAU, GEO + QUAD,
+    "tau/quad_ecc": (el.flux_dev_from_tau, "tau", TAU, GEO + QUAD,
                      {"secosw": 0.3, "sesinw": 0.2}, "tq"),
-    "tau/hybrid": (mp.flux_dev_from_tau, "tau", TAU, GEO, HYB, "th"),
-    "tau/hybrid_contact_ecc": (mp.flux_dev_from_tau, "tau", TAU, GEO,
+    "tau/hybrid": (el.flux_dev_from_tau, "tau", TAU, GEO, HYB, "th"),
+    "tau/hybrid_contact_ecc": (el.flux_dev_from_tau, "tau", TAU, GEO,
                                dict(HYB, exp_time=0.02, secosw=0.3,
                                     sesinw=0.2), "th"),
-    "tau/hybrid_basis": (mp.flux_dev_from_tau, "tau", TAU, GEO,
+    "tau/hybrid_basis": (el.flux_dev_from_tau, "tau", TAU, GEO,
                          {"limb_dark": "hybrid4", "ld_basis": True}, "th"),
 }
 # Occultors larger than the star (0.11.0): a total occultation through
@@ -75,46 +75,46 @@ ZW = np.linspace(0.0, 9.0, 64)                      # total, partial, none
 GEO_WD = [("period", 1.4079), ("a", 336.0), ("b", 3.0), ("r", 7.28)]
 TAU_WD = np.linspace(-0.012, 0.012, 64)
 KERNEL_ENTRIES.update({
-    "z/quad r>1": (mp.flux_dev_metal, "z", ZW, [("r", 7.28)] + QUAD, {},
+    "z/quad r>1": (el.flux_dev_metal, "z", ZW, [("r", 7.28)] + QUAD, {},
                    "zq"),
-    "z/ld_basis r>1": (mp.flux_dev_metal, "z", ZW, [("r", 7.28)],
+    "z/ld_basis r>1": (el.flux_dev_metal, "z", ZW, [("r", 7.28)],
                        {"ld_basis": True}, "zb"),
     "z-hybrid-entry r>1": (flux_dev_metal_hybrid, "z", ZW,
                            [("r", 7.28), ("law", "hybrid4"), ("u", W4)], {},
                            "zh"),
-    "tau/quad_contact r>1": (mp.flux_dev_from_tau, "tau", TAU_WD,
+    "tau/quad_contact r>1": (el.flux_dev_from_tau, "tau", TAU_WD,
                              GEO_WD + QUAD, {"exp_time": 0.0014}, "tq"),
-    "tau/hybrid_ecc r>1": (mp.flux_dev_from_tau, "tau", TAU_WD, GEO_WD,
+    "tau/hybrid_ecc r>1": (el.flux_dev_from_tau, "tau", TAU_WD, GEO_WD,
                            dict(HYB, secosw=0.3, sesinw=0.2), "th"),
 })
 # Oblate planets (f=, theta=): their own kernel family (metal_oblate).
 OBL = dict(HYB, f=0.2, theta=0.5)
 KERNEL_ENTRIES.update({
-    "tau/oblate": (mp.flux_dev_from_tau, "tau", TAU, GEO, OBL, "to"),
-    "tau/oblate_contact_ecc": (mp.flux_dev_from_tau, "tau", TAU, GEO,
+    "tau/oblate": (el.flux_dev_from_tau, "tau", TAU, GEO, OBL, "to"),
+    "tau/oblate_contact_ecc": (el.flux_dev_from_tau, "tau", TAU, GEO,
                                dict(OBL, exp_time=0.02, secosw=0.3,
                                     sesinw=0.2), "to"),
-    "tau/oblate_basis": (mp.flux_dev_from_tau, "tau", TAU, GEO,
+    "tau/oblate_basis": (el.flux_dev_from_tau, "tau", TAU, GEO,
                          {"limb_dark": "hybrid4", "ld_basis": True,
                           "f": 0.2, "theta": 0.5}, "to"),
 })
 GRAPH_ENTRIES = {
-    "flux_dev": (mp.flux_dev, "z", Z, [("r", 0.1)] + QUAD, {}, None),
-    "light_curve": (mp.light_curve, "z", Z, [("r", 0.1)] + QUAD, {}, None),
-    "flux_dev_poly": (mp.flux_dev_poly, "z", Z,
+    "flux_dev": (el.flux_dev, "z", Z, [("r", 0.1)] + QUAD, {}, None),
+    "light_curve": (el.light_curve, "z", Z, [("r", 0.1)] + QUAD, {}, None),
+    "flux_dev_poly": (el.flux_dev_poly, "z", Z,
                       [("r", 0.1), ("u", [0.4, 0.25])], {}, None),
-    "flux_dev_hybrid": (mp.flux_dev_hybrid, "z", Z,
+    "flux_dev_hybrid": (el.flux_dev_hybrid, "z", Z,
                         [("r", 0.1), ("w", W4), ("law", "hybrid4")], {}, None),
-    "shape_cols": (mp.shape_cols, "z", Z, [("r", 0.1), ("law", "hybrid4")],
+    "shape_cols": (el.shape_cols, "z", Z, [("r", 0.1), ("law", "hybrid4")],
                    {}, None),
-    "sn_dev": (mp.sn_dev, "z", Z, [("r", 0.1)], {}, None),
-    "sn_dev_with_aux": (mp.sn_dev_with_aux, "z", Z, [("r", 0.1)], {}, None),
-    "flux_dev_analytic": (mp.flux_dev_analytic, "z", Z,
+    "sn_dev": (el.sn_dev, "z", Z, [("r", 0.1)], {}, None),
+    "sn_dev_with_aux": (el.sn_dev_with_aux, "z", Z, [("r", 0.1)], {}, None),
+    "flux_dev_analytic": (el.flux_dev_analytic, "z", Z,
                           [("r", 0.1)] + QUAD, {}, None),
 }
 GRAPH_ENTRIES.update({
-    "flux_dev r>1": (mp.flux_dev, "z", ZW, [("r", 7.28)] + QUAD, {}, None),
-    "flux_dev_hybrid r>1": (mp.flux_dev_hybrid, "z", ZW,
+    "flux_dev r>1": (el.flux_dev, "z", ZW, [("r", 7.28)] + QUAD, {}, None),
+    "flux_dev_hybrid r>1": (el.flux_dev_hybrid, "z", ZW,
                             [("r", 7.28), ("w", W4), ("law", "hybrid4")], {},
                             None),
 })
@@ -366,7 +366,7 @@ def _loss(entry, data):
 def test_grad_fp32_on_the_default_stream_and_fp64_on_the_cpu_stream(entry):
     """d/dr in fp32 on the default stream, and in fp64 with the mx.grad
     call itself on the CPU stream (MLX's rule for a float64 input; see
-    metalplanet.dtypes). Both finite and in agreement; the fp64 route
+    elome.dtypes). Both finite and in agreement; the fp64 route
     with Python-float coefficients crashed flux_dev_analytic's backward
     pass before 0.10.7."""
     base = ALL[entry][2]
@@ -389,7 +389,7 @@ def test_grad_in_an_fp64_parameter_with_fp32_data(entry):
     """The supported form of d/dr for an fp64 r with fp32 data: the
     mx.grad call on the CPU stream (from the GPU default MLX's own
     transform machinery raises, whatever the function does -- see
-    metalplanet.dtypes). The gradient comes back fp64, equal to the
+    elome.dtypes). The gradient comes back fp64, equal to the
     all-fp32 one on the CPU stream: the cast is the identity map's."""
     d = mx.array(ALL[entry][2], dtype=mx.float32)
     with mx.stream(mx.cpu):
@@ -416,7 +416,7 @@ def test_compile_equals_eager(entry):
 # ---------------------------------------------------------------------------
 
 def _params():
-    p = mp.TransitParams()
+    p = el.TransitParams()
     p.t0, p.per, p.rp, p.a, p.inc, p.ecc, p.w = 0.0, 3.45, 0.1, 8.8, 87.0, 0.0, 90.0
     p.limb_dark, p.u = "quadratic", [0.4, 0.25]
     return p
@@ -441,8 +441,8 @@ def test_transit_model_dtype_argument_decides(container, dtype):
     (possibly rounded) times."""
     t = T_CONTAINERS[container]
     tv = _values(t)
-    ref = mp.TransitModel(_params(), tv).light_curve(_params())
-    m = mp.TransitModel(_params(), t, dtype=dtype)
+    ref = el.TransitModel(_params(), tv).light_curve(_params())
+    m = el.TransitModel(_params(), t, dtype=dtype)
     want = mx.float64 if dtype is None else dtype
     assert m.dtype == want
     got = m.light_curve(_params())
@@ -452,7 +452,7 @@ def test_transit_model_dtype_argument_decides(container, dtype):
 
 def test_transit_model_keyword_calls():
     p = _params()
-    m = mp.TransitModel(params=p, t=T)
+    m = el.TransitModel(params=p, t=T)
     ref = m.light_curve(p)
     assert np.array_equal(m.light_curve(params=p), ref)
     assert np.array_equal(np.asarray(m.light_curve_mx(params=p)), ref)

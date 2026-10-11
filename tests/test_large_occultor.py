@@ -17,10 +17,10 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet as mp
-from metalplanet.hybrid import LAWS, w_to_c
-from metalplanet.metal import flux_dev_from_tau, flux_dev_metal, metal_available
-from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+import elome as el
+from elome.hybrid import LAWS, w_to_c
+from elome.metal import flux_dev_from_tau, flux_dev_metal, metal_available
+from elome.metal_hybrid import flux_dev_metal_hybrid
 
 mpm = pytest.importorskip("mpmath")
 mpm.mp.dps = 20
@@ -95,11 +95,11 @@ def graph64(z, r, law):
     with mx.stream(mx.cpu):
         z = f64(z)
         if law == "quadratic":
-            out = mp.flux_dev(z, r, *U)
+            out = el.flux_dev(z, r, *U)
         elif law == "poly4":
-            out = mp.flux_dev_poly(z, r, list(UP))
+            out = el.flux_dev_poly(z, r, list(UP))
         else:
-            out = mp.flux_dev_hybrid(z, r, list(W[law]), law)
+            out = el.flux_dev_hybrid(z, r, list(W[law]), law)
         mx.eval(out)
         return np.asarray(out)
 
@@ -175,10 +175,10 @@ def test_total_occultation_is_exact_on_the_graph(r):
     for law in W:
         assert np.abs(graph64(z, r, law) + 1.0).max() <= 4.5e-16, law
         with mx.stream(mx.cpu):
-            B = np.asarray(mp.shape_cols(f64(z), r, law))
+            B = np.asarray(el.shape_cols(f64(z), r, law))
         assert np.abs(B + LAWS[law].norms()).max() <= 4.5e-16, law
     with mx.stream(mx.cpu):
-        s = mp.sn_dev_poly(f64(z), r, 8)
+        s = el.sn_dev_poly(f64(z), r, 8)
         mx.eval(*s)
         assert np.array_equal(np.asarray(s[0]), np.full(len(z), -math.pi))
         assert np.array_equal(np.asarray(s[1]),
@@ -187,10 +187,10 @@ def test_total_occultation_is_exact_on_the_graph(r):
         zz, rr = f64(z), f64(r)
         for law in ("quadratic", "hybrid5"):
             if law == "quadratic":
-                fn = lambda z, r, u: mx.sum(mp.flux_dev(z, r, u[0], u[1]))
+                fn = lambda z, r, u: mx.sum(el.flux_dev(z, r, u[0], u[1]))
                 u = f64(U)
             else:
-                fn = lambda z, r, u: mx.sum(mp.flux_dev_hybrid(z, r, u, law))
+                fn = lambda z, r, u: mx.sum(el.flux_dev_hybrid(z, r, u, law))
                 u = f64(W[law])
             g = mx.grad(fn, argnums=(0, 1, 2))(zz, rr, u)
             mx.eval(*g)
@@ -236,7 +236,7 @@ P_, A_ = 1.4079, 336.0
 
 
 def _params(r, b, ecc=0.0, law="quadratic"):
-    p = mp.TransitParams()
+    p = el.TransitParams()
     p.t0, p.per, p.rp, p.a = 0.0, P_, r, A_
     p.inc = math.degrees(math.acos(b / A_))
     p.ecc, p.w = ecc, 90.0 if ecc == 0.0 else 63.0
@@ -257,7 +257,7 @@ def test_no_eclipse_at_the_far_conjunction(b, ecc, dtype, law):
         pytest.skip("Metal unavailable")
     p = _params(7.28, b, ecc, law)
     t = np.concatenate([np.linspace(0.05, 0.95, 901) * P_])
-    f = mp.TransitModel(p, t, dtype=dtype).light_curve(p)
+    f = el.TransitModel(p, t, dtype=dtype).light_curve(p)
     assert np.array_equal(f, np.ones_like(f))
 
 
@@ -266,7 +266,7 @@ def test_secondary_eclipse_has_no_dip_at_primary_conjunction():
     p = _params(7.28, 3.0)
     p.fp, p.t_secondary = 1e-3, 0.5 * P_
     t = np.linspace(-0.02, 0.02, 401)
-    f = mp.TransitModel(p, t, transittype="secondary").light_curve(p)
+    f = el.TransitModel(p, t, transittype="secondary").light_curve(p)
     assert np.array_equal(f, np.full_like(f, 1.0 + 1e-3))
 
 
@@ -318,7 +318,7 @@ def _exact_exposures(tc, b, r):
             owner.append(np.full(64, i))
     nodes, wts, owner = map(np.concatenate, (nodes, wts, owner))
     with mx.stream(mx.cpu):
-        f = np.asarray(mp.flux_dev(f64(_z_of_t(nodes, b)), r, *U))
+        f = np.asarray(el.flux_dev(f64(_z_of_t(nodes, b)), r, *U))
     return np.bincount(owner, weights=f * wts) / EXP
 
 
@@ -335,14 +335,14 @@ def test_contact_rule_against_the_exact_piecewise_integral(r, b):
             tau = np.asarray(flux_dev_from_tau(
                 f64(tc), P_, A_, b, r, *U, exp_time=EXP,
                 integration="contact", n_gl=n_gl))
-        tm = mp.TransitModel(p, tc, exp_time=EXP, integration="contact",
+        tm = el.TransitModel(p, tc, exp_time=EXP, integration="contact",
                              n_gl=n_gl).light_curve(p) - 1.0
         assert np.abs(tau - ref).max() < tol, n_gl
         assert np.abs(tm - ref).max() < tol, n_gl
 
 
 def test_inner_contacts_sit_at_r_minus_one():
-    from metalplanet.exposure import contact_offsets
+    from elome.exposure import contact_offsets
     r, b = 7.28, 3.0
     with mx.stream(mx.cpu):               # an internal helper: fp64 on CPU
         phis = [float(np.asarray(x)) for x in contact_offsets(
@@ -365,8 +365,8 @@ def test_graph_gradients_match_finite_differences(r, law):
 
     def F(z, rr):
         if law == "quadratic":
-            return mp.flux_dev(z, rr, *U)
-        return mp.flux_dev_hybrid(z, rr, list(W[law]), law)
+            return el.flux_dev(z, rr, *U)
+        return el.flux_dev_hybrid(z, rr, list(W[law]), law)
 
     with mx.stream(mx.cpu):
         gz, gr = mx.grad(lambda z, rr: mx.sum(F(z, rr)), argnums=(0, 1))(
@@ -435,8 +435,8 @@ def test_hybrid_internal_contact_is_finite_in_fp32(law):
     z = f32(zs)[None, :]
     r = f32(rr)[None, :]
     w = list(W[law])
-    g = np.asarray(mp.flux_dev_hybrid(z, r, w, law))
-    gb = np.asarray(mp.shape_cols(z, r, law))
+    g = np.asarray(el.flux_dev_hybrid(z, r, w, law))
+    gb = np.asarray(el.shape_cols(z, r, law))
     assert np.isfinite(g).all() and np.isfinite(gb).all()
     if KERNEL:
         k = np.asarray(flux_dev_metal_hybrid(f32(zs), f32(rr), law, w))
@@ -453,14 +453,14 @@ def test_white_dwarf_end_to_end(b):
     r^2 budget; the contact rule finite."""
     p = _params(7.28, b)
     t = np.linspace(-0.01, 0.01, 801)
-    f64_ = mp.TransitModel(p, t).light_curve(p)
+    f64_ = el.TransitModel(p, t).light_curve(p)
     mid = f64_[400] - 1.0
     assert abs(mid - oracle(b, 7.28, "quadratic")) < 1e-12
-    fc = mp.TransitModel(p, t, exp_time=EXP, integration="contact",
+    fc = el.TransitModel(p, t, exp_time=EXP, integration="contact",
                          n_gl=9).light_curve(p)
     assert np.isfinite(fc).all() and fc.min() >= -1e-12
     if KERNEL:
-        f32_ = mp.TransitModel(p, t, dtype=mx.float32).light_curve(p)
+        f32_ = el.TransitModel(p, t, dtype=mx.float32).light_curve(p)
         assert np.abs(f32_ - f64_).max() < TOL32[7.28]
 
 
@@ -468,10 +468,10 @@ def test_white_dwarf_end_to_end(b):
 def test_anvil_target_samples_large_occultors(b):
     """make_transit_target with widened bounds (README): finite density and
     gradient at r > 1, and the truth scores highest."""
-    A = pytest.importorskip("metalplanet.anvil")
+    A = pytest.importorskip("elome.anvil")
     p = _params(7.28, b)
     t = np.linspace(-0.01, 0.01, 1001)
-    y = mp.TransitModel(p, t).light_curve(p)
+    y = el.TransitModel(p, t).light_curve(p)
     y = y + np.random.default_rng(0).normal(0.0, 1e-3, t.size)
     tg = A.make_transit_target(t, y, 1e-3, 0.0, P_, bounds={
         "r": (1.0, 12.0), "b": (0.0, 13.0), "a": (1.5, 1000.0)})

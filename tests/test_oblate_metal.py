@@ -17,11 +17,11 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet as mp
-from metalplanet import metal as M
-from metalplanet import metal_oblate as MO
-from metalplanet import oblate as O
-from metalplanet.hybrid import LAWS, hybrid_norms
+import elome as el
+from elome import metal as M
+from elome import metal_oblate as MO
+from elome import oblate as O
+from elome.hybrid import LAWS, hybrid_norms
 
 pytestmark = pytest.mark.skipif(
     not (M.metal_available() and M._gpu_stream_active()),
@@ -161,7 +161,7 @@ def _flux(tau, dtype, law, b, r, f, th, ecc, basis=False, **kw):
         kw["u"] = W[law]
     stream = mx.cpu if dtype == mx.float64 else mx.gpu
     with mx.stream(stream):
-        out = mp.flux_dev_from_tau(mx.array(tau, dtype=dtype), P, A_RS, b, r, **kw)
+        out = el.flux_dev_from_tau(mx.array(tau, dtype=dtype), P, A_RS, b, r, **kw)
         mx.eval(out)
         return np.asarray(out.astype(mx.float32) if dtype == mx.float32 else out,
                           dtype=np.float64)
@@ -202,7 +202,7 @@ def _grads(dtype, integration, extra, b, r, f, th, ecc, law, basis):
                 kw["ld_basis"] = True
             else:
                 kw["u"] = w_
-            return mx.sum(A(ct) * mp.flux_dev_from_tau(t_, per, a, b_, r_, **kw))
+            return mx.sum(A(ct) * el.flux_dev_from_tau(t_, per, a, b_, r_, **kw))
         g = mx.grad(loss, argnums=tuple(range(10)))(
             *(A(v) for v in (TAU, P, A_RS, b, r, f, th, W[law], k, h)))
         mx.eval(g)
@@ -252,14 +252,14 @@ def test_each_chain_is_its_own():
                 f=rng.uniform(0.05, 0.5, n), theta=rng.uniform(0, np.pi, n))
     tau = np.stack([TAU] * n).astype(np.float32)
     w = np.array(W["hybrid4"], np.float32)
-    rows = mp.flux_dev_from_tau(tau, P, A_RS, mx.array(pars["b"], dtype=mx.float32),
+    rows = el.flux_dev_from_tau(tau, P, A_RS, mx.array(pars["b"], dtype=mx.float32),
                                 mx.array(pars["r"], dtype=mx.float32), limb_dark="hybrid4",
                                 u=w, f=mx.array(pars["f"], dtype=mx.float32),
                                 theta=mx.array(pars["theta"], dtype=mx.float32),
                                 exp_time=EXP)
     rows = np.asarray(rows)
     for j in range(n):
-        one = np.asarray(mp.flux_dev_from_tau(
+        one = np.asarray(el.flux_dev_from_tau(
             TAU.astype(np.float32), P, A_RS, float(pars["b"][j]), float(pars["r"][j]),
             limb_dark="hybrid4", u=w, f=float(pars["f"][j]),
             theta=float(pars["theta"][j]), exp_time=EXP))
@@ -277,7 +277,7 @@ def test_no_nan_on_a_sweep(integration, extra):
              (0.3, 0.1, 1.01 * F_SW, 0.2), (0.0, 0.3, 0.5, 0.0)]
     for b, r, f, th in cases:
         def loss(r_, f_, th_, b_):
-            return mx.sum(mp.flux_dev_from_tau(mx.array(tau), P, A_RS, b_, r_,
+            return mx.sum(el.flux_dev_from_tau(mx.array(tau), P, A_RS, b_, r_,
                                                limb_dark="hybrid5", u=W["hybrid5"],
                                                f=f_, theta=th_, integration=integration,
                                                **extra))
@@ -292,28 +292,28 @@ def test_no_nan_on_a_sweep(integration, extra):
 def test_out_of_transit_and_far_side_exactly_zero():
     tau = np.concatenate([np.linspace(-1.7, -0.2, 64),
                           np.linspace(0.2, 1.7, 64)]).astype(np.float32)
-    got = np.asarray(mp.flux_dev_from_tau(tau, P, A_RS, 0.1, 0.1, limb_dark="hybrid5",
+    got = np.asarray(el.flux_dev_from_tau(tau, P, A_RS, 0.1, 0.1, limb_dark="hybrid5",
                                           u=W["hybrid5"], f=0.3, theta=0.4))
     assert np.array_equal(got, np.zeros_like(got))
 
 
 def test_kernels_cached_per_definition_orbit_and_basis():
-    from metalplanet.hybrid import HybridLaw
+    from elome.hybrid import HybridLaw
     before = {k for k in M._kernels if k[0] == "obl"}
     custom = HybridLaw("my oblate law", (0.2,), LAWS["hybrid2"].shapes)
-    mp.flux_dev_from_tau(TAU.astype(np.float32), P, A_RS, 0.3, 0.1,
+    el.flux_dev_from_tau(TAU.astype(np.float32), P, A_RS, 0.3, 0.1,
                          limb_dark=custom, u=[0.3, 0.2], f=0.2, theta=0.4)
     new = {k for k in M._kernels if k[0] == "obl"} - before
     assert any(k[1] == custom.definition for k in new) or \
         ("obl", custom.definition, "circ", False) in M._kernels
     again = len(M._kernels)
-    mp.flux_dev_from_tau(TAU.astype(np.float32), P, A_RS, 0.3, 0.1,
+    el.flux_dev_from_tau(TAU.astype(np.float32), P, A_RS, 0.3, 0.1,
                          limb_dark=custom, u=[0.3, 0.2], f=0.2, theta=0.4)
     assert len(M._kernels) == again
 
 
 def test_out_of_domain_arrays_give_nan_on_the_kernel_route():
-    got = np.asarray(mp.flux_dev_from_tau(
+    got = np.asarray(el.flux_dev_from_tau(
         TAU.astype(np.float32), P, A_RS, 0.3, mx.array(0.6, dtype=mx.float32),
         limb_dark="hybrid4", u=W["hybrid4"], f=mx.array(0.5, dtype=mx.float32)))
     assert np.isnan(got[len(TAU) // 2])
@@ -323,8 +323,8 @@ def test_out_of_domain_arrays_give_nan_on_the_kernel_route():
 def test_contact_kernel_matches_the_fp64_graph(orbit):
     """One thread per chain, the graph's scheme: to fp32's level, including
     grazes (a third of the chains) and tilted planets."""
-    from metalplanet.metal import _ecc_shape
-    from metalplanet.oblate_tau import contact_offsets_oblate
+    from elome.metal import _ecc_shape
+    from elome.oblate_tau import contact_offsets_oblate
     rng = np.random.default_rng(4)
     n = 200
     f = rng.choice([0.01, 0.1, 0.3, 0.5], n)
@@ -363,11 +363,11 @@ def test_contacts_are_solved_only_for_the_contact_rule():
     try:
         tau = mx.array(np.stack([TAU] * 3).astype(np.float32))
         kw = dict(limb_dark="hybrid4", u=W["hybrid4"], f=0.2, theta=0.4)
-        mx.eval(mp.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw))
-        mx.eval(mp.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw, exp_time=EXP,
+        mx.eval(el.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw))
+        mx.eval(el.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw, exp_time=EXP,
                                      integration="supersample", n_sub=5))
         assert not seen
-        mx.eval(mp.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw, exp_time=EXP))
+        mx.eval(el.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw, exp_time=EXP))
         assert len(seen) == 1
     finally:
         MO.contact_offsets_oblate_kernel = orig

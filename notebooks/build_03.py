@@ -4,7 +4,7 @@
 
 Generated rather than hand-edited, so its prose and code stay reviewable as
 ordinary source in a diff. Every code cell is executed before the notebook
-is committed (it needs only metalplanet; matplotlib is optional); the
+is committed (it needs only elome; matplotlib is optional); the
 committed copy has no outputs.
 """
 import os
@@ -19,9 +19,9 @@ def code(text): CELLS.append(("code", text.strip("\n")))
 
 
 md(r"""
-# Spherical and oblate planets with MetalPlanet
+# Spherical and oblate planets with Elómë
 
-MetalPlanet computes transit light curves -- `(parameters, times) -> flux` --
+Elómë computes transit light curves -- `(parameters, times) -> flux` --
 and that map's derivatives, on the CPU in float64 or on an Apple GPU in
 float32. Since v0.13 the planet may be **spherical** (a disc on the sky) or
 **oblate** (an ellipse on the sky: a rotationally flattened planet, or one
@@ -55,7 +55,7 @@ import time
 import numpy as np
 import mlx.core as mx
 
-import metalplanet as mp
+import elome as el
 
 try:
     import matplotlib.pyplot as plt
@@ -63,7 +63,7 @@ try:
 except ImportError:
     HAVE_PLT = False
 
-print("metalplanet", mp.__version__, "| Metal kernels available:", mp.metal_available())
+print("elome", el.__version__, "| Metal kernels available:", el.metal_available())
 
 def timeit(fn, reps=5):
     \"\"\"Best of `reps` wall-clock times of fn() in ms (fn must finish its work).\"\"\"
@@ -88,7 +88,7 @@ degrees; `rp` and `a` are in stellar radii.
 """)
 
 code("""
-p = mp.TransitParams()
+p = el.TransitParams()
 p.t0 = 0.0            # time of inferior conjunction [d]
 p.per = 3.456         # orbital period [d]
 p.rp = 0.1            # Rp / R*
@@ -100,7 +100,7 @@ p.limb_dark = "quadratic"
 p.u = [0.40, 0.25]
 
 t = np.linspace(-0.12, 0.12, 2001)   # days around mid-transit
-m = mp.TransitModel(p, t)            # float64 on the CPU by default
+m = el.TransitModel(p, t)            # float64 on the CPU by default
 flux = m.light_curve(p)
 
 b = p.a * math.cos(math.radians(p.inc))
@@ -123,7 +123,7 @@ will see, whether the planet is oblate).
 md(r"""
 ## A2. Hybrid limb darkening
 
-The quadratic law is the default, but MetalPlanet also has three **hybrid
+The quadratic law is the default, but Elómë also has three **hybrid
 laws** (from SquishierPlanet): even powers of $\mu$ plus "double-pole"
 terms $(\mu^2+\epsilon)^{-2}$ that follow a real star's steep fall at the
 limb. On simulated M-G dwarfs `hybrid4` is 15-20x more accurate than the
@@ -139,12 +139,12 @@ planet can use.**
 """)
 
 code("""
-w5 = mp.simplex_from_q_np([0.3, 0.5, 0.2, 0.6, 0.4])   # 5 weights in the physical simplex
+w5 = el.simplex_from_q_np([0.3, 0.5, 0.2, 0.6, 0.4])   # 5 weights in the physical simplex
 print("hybrid5 weights:", np.round(w5, 4), "| centre-to-limb drop:", round(float(w5.sum()), 4))
 
 ph = copy.copy(p)
 ph.limb_dark, ph.u = "hybrid5", list(w5)
-flux_h5 = mp.TransitModel(ph, t).light_curve(ph)
+flux_h5 = el.TransitModel(ph, t).light_curve(ph)
 print(f"hybrid5 depth = {(1 - flux_h5.min()) * 1e6:.0f} ppm")
 
 # the intensity profiles behind the two curves: I/I(1) = 1 - sum_j w_j T_j(mu),
@@ -153,7 +153,7 @@ mu = np.linspace(0, 1, 401)
 def pole_shape(mu, eps):
     p_ = 1 + eps
     return ((mu**2 + eps)**-2 - p_**-2) / (eps**-2 - p_**-2)
-T = [1 - mu**4, (1 - mu**2)**2] + [pole_shape(mu, e) for e in mp.HYBRID5.eps]
+T = [1 - mu**4, (1 - mu**2)**2] + [pole_shape(mu, e) for e in el.HYBRID5.eps]
 I_h5 = 1 - sum(wj * Tj for wj, Tj in zip(w5, T))
 I_q = 1 - 0.40 * (1 - mu) - 0.25 * (1 - mu)**2
 
@@ -179,11 +179,11 @@ the same accuracy.
 code("""
 EXP = 29.4 / 60 / 24                      # Kepler long cadence [d]
 tc = np.linspace(-0.12, 0.12, 241)
-ref = mp.TransitModel(p, tc, supersample_factor=401, exp_time=EXP).light_curve(p)
+ref = el.TransitModel(p, tc, supersample_factor=401, exp_time=EXP).light_curve(p)
 for label, kw in [("instantaneous", {}),
                   ("supersample x 7", dict(supersample_factor=7, exp_time=EXP)),
                   ("contact rule, n_gl = 5", dict(integration="contact", exp_time=EXP, n_gl=5))]:
-    f_ = mp.TransitModel(p, tc, **kw).light_curve(p)
+    f_ = el.TransitModel(p, tc, **kw).light_curve(p)
     print(f"{label:24s} max |error| vs 401-point supersampling: {np.abs(f_ - ref).max():.1e}")
 """)
 
@@ -232,8 +232,8 @@ pa.rp = 0.1 * (1 + 0.05 * rng.standard_normal(n_sets))
 pa.inc = 87.0 + 0.5 * rng.standard_normal(n_sets)
 
 t_big = np.linspace(-0.12, 0.12, 20_000)
-m64 = mp.TransitModel(p, t_big)
-m32 = mp.TransitModel(p, t_big, dtype=mx.float32)
+m64 = el.TransitModel(p, t_big)
+m32 = el.TransitModel(p, t_big, dtype=mx.float32)
 print("fp32 vs fp64, one set:", f"{np.abs(m32.light_curve(p) - m64.light_curve(p)).max():.1e}")
 npts = n_sets * t_big.size
 ms = timeit(lambda: m32.light_curves(pa))
@@ -243,7 +243,7 @@ print(f"light_curves, {n_sets} sets x {t_big.size:,} points (returned as numpy):
 tau_b = mx.array(np.tile(t_big, (n_sets, 1)), dtype=mx.float32)      # t0 = 0: tau = t
 rp_b = mx.array(pa.rp, dtype=mx.float32)
 b_b = mx.array(8.8 * np.cos(np.radians(pa.inc)), dtype=mx.float32)
-ms_k = timeit(lambda: mx.eval(mp.flux_dev_from_tau(tau_b, 3.456, 8.8, b_b, rp_b, 0.40, 0.25)))
+ms_k = timeit(lambda: mx.eval(el.flux_dev_from_tau(tau_b, 3.456, 8.8, b_b, rp_b, 0.40, 0.25)))
 print(f"flux_dev_from_tau on the GPU, same points: {ms_k:.2f} ms ({ms_k * 1e6 / npts:.2f} ns per point)")
 """)
 
@@ -260,11 +260,11 @@ linear block and integrate them out analytically.
 
 code("""
 tau = np.linspace(-0.12, 0.12, 1000)
-dev = mp.flux_dev_from_tau(tau, 3.456, 8.8, b, 0.1, limb_dark="hybrid5", u=list(w5))
-B = mp.flux_dev_from_tau(tau, 3.456, 8.8, b, 0.1, limb_dark="hybrid5", ld_basis=True)
+dev = el.flux_dev_from_tau(tau, 3.456, 8.8, b, 0.1, limb_dark="hybrid5", u=list(w5))
+B = el.flux_dev_from_tau(tau, 3.456, 8.8, b, 0.1, limb_dark="hybrid5", ld_basis=True)
 c_ = np.concatenate([[1.0], -w5])
 print("columns:", np.asarray(B).shape, "| identity (B @ c)/(N @ c) == F - 1:",
-      f"{np.abs(np.asarray(B) @ c_ / (mp.hybrid_norms('hybrid5') @ c_) - np.asarray(dev)).max():.1e}")
+      f"{np.abs(np.asarray(B) @ c_ / (el.hybrid_norms('hybrid5') @ c_) - np.asarray(dev)).max():.1e}")
 """)
 
 # ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ md(r"""
 
 ## B1. The geometry
 
-A flattened planet projects to an **ellipse** on the sky. MetalPlanet
+A flattened planet projects to an **ellipse** on the sky. Elómë
 describes it with three numbers:
 
 * `rp` -- the **area-equivalent radius** $\sqrt{AB}$, so the planet blocks
@@ -329,8 +329,8 @@ ps = copy.copy(ph)                       # the same planet, spherical
 ps.f, ps.theta = None, None
 
 t_hr = np.linspace(-0.12, 0.12, 4001)
-flux_obl = mp.TransitModel(po, t_hr).light_curve(po)
-flux_sph = mp.TransitModel(ps, t_hr).light_curve(ps)
+flux_obl = el.TransitModel(po, t_hr).light_curve(po)
+flux_sph = el.TransitModel(ps, t_hr).light_curve(ps)
 resid = (flux_obl - flux_sph) * 1e6
 print(f"depth: oblate {(1 - flux_obl.min()) * 1e6:.0f} ppm, spherical {(1 - flux_sph.min()) * 1e6:.0f} ppm")
 print(f"oblate - spherical: {resid.min():+.1f} .. {resid.max():+.1f} ppm")
@@ -357,7 +357,7 @@ code("""
 def residual(f, theta):
     q = copy.copy(po)
     q.f, q.theta = f, theta
-    return (mp.TransitModel(q, t_hr).light_curve(q) - flux_sph) * 1e6
+    return (el.TransitModel(q, t_hr).light_curve(q) - flux_sph) * 1e6
 
 res_theta = {theta: residual(0.1, theta) for theta in (0.0, 30.0, 60.0, 90.0)}
 for theta, r_ in res_theta.items():
@@ -397,9 +397,9 @@ md(r"""
 
 A tilted ellipse does not touch the limb at the same distance on the way in
 as on the way out, so its four contact times are **not symmetric** about
-mid-transit, and they differ from a sphere's. MetalPlanet solves them per
+mid-transit, and they differ from a sphere's. Elómë solves them per
 side; the contact rule then splits each exposure at the oblate planet's own
-kinks. `mp.contact_offsets_oblate` exposes them (as orbital phase).
+kinks. `el.contact_offsets_oblate` exposes them (as orbital phase).
 """)
 
 code("""
@@ -409,7 +409,7 @@ b_ = 8.8 * math.cos(math.radians(87.0))
 # the oblate planet's contacts, per side (per-chain arrays in, phases out)
 with mx.stream(mx.cpu):
     arr = lambda v: mx.array([v], dtype=mx.float64)
-    c_obl = mp.contact_offsets_oblate(arr(8.8), arr(b_), arr(0.1), arr(0.1), arr(math.radians(30.0)))
+    c_obl = el.contact_offsets_oblate(arr(8.8), arr(b_), arr(0.1), arr(0.1), arr(math.radians(30.0)))
     c_obl = [float(np.asarray(c)[0]) * to_min for c in c_obl]
 # a sphere's, in closed form: sin^2(phi) = ((1 +- r)^2 - b^2) / (a^2 - b^2)
 phi = [math.asin(math.sqrt(((1 + s_ * 0.1)**2 - b_**2) / (8.8**2 - b_**2))) for s_ in (1, -1)]
@@ -417,10 +417,10 @@ c_sph = [-phi[0] * to_min, -phi[1] * to_min, phi[1] * to_min, phi[0] * to_min]
 for name, c in (("oblate f=0.1, 30 deg", c_obl), ("sphere, same area", c_sph)):
     print(f"{name:22s} contacts [min from mid-transit]: " + "  ".join(f"{v:+8.3f}" for v in c))
 
-ref = mp.TransitModel(po, tc, supersample_factor=401, exp_time=EXP).light_curve(po)
+ref = el.TransitModel(po, tc, supersample_factor=401, exp_time=EXP).light_curve(po)
 for label, kw in [("supersample x 7", dict(supersample_factor=7, exp_time=EXP)),
                   ("contact rule, n_gl = 5", dict(integration="contact", exp_time=EXP, n_gl=5))]:
-    f_ = mp.TransitModel(po, tc, **kw).light_curve(po)
+    f_ = el.TransitModel(po, tc, **kw).light_curve(po)
     print(f"{label:24s} max |error| vs 401-point supersampling: {np.abs(f_ - ref).max():.1e}")
 """)
 
@@ -440,7 +440,7 @@ e_, w_ = 0.3, 40.0
 cosi = b_ * (1 + e_ * math.sin(math.radians(w_))) / (8.8 * (1 - e_**2))   # same b as circular
 pe = copy.copy(po)
 pe.ecc, pe.w, pe.inc = e_, w_, math.degrees(math.acos(cosi))
-flux_ecc = mp.TransitModel(pe, t_hr).light_curve(pe)
+flux_ecc = el.TransitModel(pe, t_hr).light_curve(pe)
 dt_hr = (t_hr[1] - t_hr[0]) * 24
 print(f"b at conjunction: {b_:.3f} (both orbits)")
 print(f"depth: e = 0.3 {(1 - flux_ecc.min()) * 1e6:.0f} ppm, circular {(1 - flux_obl.min()) * 1e6:.0f} ppm")
@@ -457,7 +457,7 @@ its gradient is per degree.)
 
 code("""
 with mx.stream(mx.cpu):
-    mo = mp.TransitModel(po, t_hr)
+    mo = el.TransitModel(po, t_hr)
     def loss(f, theta):
         q = copy.copy(po)
         q.f, q.theta = f, theta
@@ -493,10 +493,10 @@ pa_o.theta = 30.0 + 20.0 * rng.standard_normal(n_sets)
 pa_s = copy.copy(pa_o)                    # ... and the same sets, spherical
 pa_s.f = pa_s.theta = None
 
-mo32 = mp.TransitModel(po, t_big, dtype=mx.float32)
-ms32 = mp.TransitModel(ps, t_big, dtype=mx.float32)
+mo32 = el.TransitModel(po, t_big, dtype=mx.float32)
+ms32 = el.TransitModel(ps, t_big, dtype=mx.float32)
 print("fp32 vs fp64, one oblate set:",
-      f"{np.abs(mo32.light_curve(po) - mp.TransitModel(po, t_big).light_curve(po)).max():.1e}")
+      f"{np.abs(mo32.light_curve(po) - el.TransitModel(po, t_big).light_curve(po)).max():.1e}")
 t_o = timeit(lambda: mo32.light_curves(pa_o))
 t_s = timeit(lambda: ms32.light_curves(pa_s))
 print(f"light_curves, {n_sets} sets x {t_big.size:,} points (returned as numpy): "
@@ -506,9 +506,9 @@ print(f"light_curves, {n_sets} sets x {t_big.size:,} points (returned as numpy):
 w_b = mx.array(np.tile(w5, (n_sets, 1)), dtype=mx.float32)
 f_b = mx.array(pa_o.f, dtype=mx.float32)
 th_b = mx.array(np.radians(pa_o.theta), dtype=mx.float32)
-k_s = timeit(lambda: mx.eval(mp.flux_dev_from_tau(tau_b, 3.456, 8.8, b_b, rp_b,
+k_s = timeit(lambda: mx.eval(el.flux_dev_from_tau(tau_b, 3.456, 8.8, b_b, rp_b,
                                                   limb_dark="hybrid5", u=w_b)))
-k_o = timeit(lambda: mx.eval(mp.flux_dev_from_tau(tau_b, 3.456, 8.8, b_b, rp_b,
+k_o = timeit(lambda: mx.eval(el.flux_dev_from_tau(tau_b, 3.456, 8.8, b_b, rp_b,
                                                   limb_dark="hybrid5", u=w_b, f=f_b, theta=th_b)))
 print(f"flux_dev_from_tau on the GPU: spherical {k_s:.2f} ms ({k_s * 1e6 / npts:.2f} ns/pt), "
       f"oblate {k_o:.1f} ms ({k_o * 1e6 / npts:.1f} ns/pt): {k_o / k_s:.0f}x")
@@ -533,19 +533,19 @@ so collapsing the limb-darkening weights works for oblate planets as well.
 """)
 
 code("""
-dev_o = mp.flux_dev_from_tau(tau, 3.456, 8.8, b, 0.1, limb_dark="hybrid5", u=list(w5),
+dev_o = el.flux_dev_from_tau(tau, 3.456, 8.8, b, 0.1, limb_dark="hybrid5", u=list(w5),
                              f=0.1, theta=math.radians(30.0))
-B_o = mp.flux_dev_from_tau(tau, 3.456, 8.8, b, 0.1, limb_dark="hybrid5", ld_basis=True,
+B_o = el.flux_dev_from_tau(tau, 3.456, 8.8, b, 0.1, limb_dark="hybrid5", ld_basis=True,
                            f=0.1, theta=math.radians(30.0))
 print("identity (B @ c)/(N @ c) == F - 1:",
-      f"{np.abs(np.asarray(B_o) @ c_ / (mp.hybrid_norms('hybrid5') @ c_) - np.asarray(dev_o)).max():.1e}")
+      f"{np.abs(np.asarray(B_o) @ c_ / (el.hybrid_norms('hybrid5') @ c_) - np.asarray(dev_o)).max():.1e}")
 
 # per-chain shapes, float32 on the GPU (the kernel path a sampler uses)
 n = 64
 tau32 = mx.array(np.tile(tau, (n, 1)), dtype=mx.float32)
 f_c = mx.array(rng.uniform(0.0, 0.3, n), dtype=mx.float32)
 th_c = mx.array(rng.uniform(0.0, math.pi, n), dtype=mx.float32)
-loss = lambda f, th: mx.sum(mp.flux_dev_from_tau(tau32, 3.456, 8.8, b, 0.1, limb_dark="hybrid5",
+loss = lambda f, th: mx.sum(el.flux_dev_from_tau(tau32, 3.456, 8.8, b, 0.1, limb_dark="hybrid5",
                                                  u=list(w5), f=f, theta=th))
 gf, gth = mx.grad(loss, argnums=(0, 1))(f_c, th_c)
 print("per-chain gradients:", gf.shape, gth.shape, "| finite:",
@@ -585,7 +585,7 @@ for bad in (dict(limb_dark="quadratic", u=[0.4, 0.25]), dict(rp=0.6, f=0.5)):
     for k, v in bad.items():
         setattr(q, k, v)
     try:
-        mp.TransitModel(q, t).light_curve(q)
+        el.TransitModel(q, t).light_curve(q)
     except ValueError as err:
         print(f"{bad}: ValueError: {err}")
 """)

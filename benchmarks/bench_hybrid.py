@@ -1,6 +1,6 @@
 """flux_dev_from_tau with the hybrid laws against the quadratic law.
 
-The hybrid laws need no elliptic integral (metalplanet/hybrid.py); the
+The hybrid laws need no elliptic integral (elome/hybrid.py); the
 quadratic law's mu term needs the 10-iteration cel3 recursion that
 dominates its kernel. Does that show in the fused fp32 kernels? Routes,
 at the production shape (512 chains x 5,000 phase-ordered points, contact
@@ -38,7 +38,7 @@ WEIGHTS = {"hybrid2": [0.3, 0.2], "hybrid4": [0.2, 0.2, 0.1, 0.1],
 def worker(route, grad, n, m, integration, reps):
     import numpy as np
     import mlx.core as mx
-    from metalplanet.metal import flux_dev_from_tau
+    from elome.metal import flux_dev_from_tau
 
     rng = np.random.default_rng(11)
     tau = np.linspace(-0.14, 0.14, m)[None, :] + np.zeros((n, 1))

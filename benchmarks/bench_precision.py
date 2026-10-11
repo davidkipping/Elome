@@ -33,10 +33,10 @@ def check(name, flux):
           flush=True)
 
 
-check("metalplanet fp64", adapters.metalplanet_fp64_run(
-    adapters.metalplanet_fp64_prepare(N)))
-check("metalplanet fp32(GPU)", adapters.metalplanet_fp32_run(
-    adapters.metalplanet_fp32_prepare(N)))
+check("elome fp64", adapters.elome_fp64_run(
+    adapters.elome_fp64_prepare(N)))
+check("elome fp32(GPU)", adapters.elome_fp32_run(
+    adapters.elome_fp32_prepare(N)))
 check("batman", adapters.batman_run(adapters.batman_prepare(N)))
 check("pytransit (exact)", adapters.pytransit_run(
     adapters.pytransit_prepare(N, interpolate=False)))
@@ -71,10 +71,10 @@ def check_ecc(name, flux):
           flush=True)
 
 
-check_ecc("metalplanet fp64", adapters.metalplanet_fp64_ecc_run(
-    adapters.metalplanet_fp64_ecc_prepare(N)))
-check_ecc("metalplanet fp32(GPU)", adapters.metalplanet_fp32_ecc_run(
-    adapters.metalplanet_fp32_ecc_prepare(N)))
+check_ecc("elome fp64", adapters.elome_fp64_ecc_run(
+    adapters.elome_fp64_ecc_prepare(N)))
+check_ecc("elome fp32(GPU)", adapters.elome_fp32_ecc_run(
+    adapters.elome_fp32_ecc_prepare(N)))
 check_ecc("batman", adapters.batman_ecc_run(
     adapters.batman_ecc_prepare(N)))
 check_ecc("pytransit (exact)", adapters.pytransit_ecc_run(

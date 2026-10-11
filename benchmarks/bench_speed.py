@@ -27,20 +27,20 @@ from scenario import N_SWEEP, THREADS  # noqa: E402
 
 # (code, thread-counts). 0 = "all cores / not partitionable".
 SINGLE = [
-    ("metalplanet_fp32", [0]),          # GPU
-    ("metalplanet_fp64", [0]),          # MLX CPU stream
+    ("elome_fp32", [0]),          # GPU
+    ("elome_fp64", [0]),          # MLX CPU stream
     ("batman", [1]),                    # probed: this build lacks OpenMP
     ("pytransit", THREADS),             # numba
     ("exoplanet", [1]),                 # single-threaded C++
     ("jaxoplanet", [0]),                # XLA CPU pool (all cores)
 ]
-BATCH = ["metalplanet_gpu", "pytransit", "jaxoplanet", "batman",
+BATCH = ["elome_gpu", "pytransit", "jaxoplanet", "batman",
          "exoplanet"]
 # eccentric sweep: same codes, each solving Kepler's equation itself, so
 # the numbers include the orbit as well as the photometry.
 ECC_CODES = [
-    ("metalplanet_fp32", [0]),
-    ("metalplanet_fp64", [0]),
+    ("elome_fp32", [0]),
+    ("elome_fp64", [0]),
     ("batman", [1]),
     ("pytransit", THREADS),
     ("exoplanet", [1]),

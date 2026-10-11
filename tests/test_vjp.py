@@ -6,8 +6,8 @@ import math
 import mlx.core as mx
 import numpy as np
 
-from metalplanet import flux_dev
-from metalplanet.vjp import flux_dev_analytic
+from elome import flux_dev
+from elome.vjp import flux_dev_analytic
 
 RNG = np.random.default_rng(41)
 

@@ -1,7 +1,7 @@
 """E4: the 10-parameter eccentric anvil target.
 
 Beyond ordinary forward/gradient correctness this pins the thing the
-plan's review flagged: MetalPlanet clamps every numerical hazard, so an
+plan's review flagged: Elómë clamps every numerical hazard, so an
 unphysical geometry returns a perfectly ordinary finite log-likelihood.
 Without the joint-constraint barrier the chain samples an improper
 posterior and nothing complains.
@@ -13,10 +13,10 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-from metalplanet.anvil import (PARAM_NAMES_ECC, ecc_constraint_penalty,
+from elome.anvil import (PARAM_NAMES_ECC, ecc_constraint_penalty,
                                import_engine, make_ecc_target,
                                make_ecc_transit_flux)
-from metalplanet.orbit import epoch_center_times
+from elome.orbit import epoch_center_times
 
 applemcmc, _ = import_engine()
 PREF = 3.456
@@ -179,7 +179,7 @@ def test_penalized_loglike_hi_runs_from_the_default_stream():
 
 
 def test_core_names_are_shared_by_both_factories():
-    from metalplanet.anvil import make_quad_transit_flux, make_ecc_transit_flux
+    from elome.anvil import make_quad_transit_flux, make_ecc_transit_flux
     x = mx.array(epoch_center_times(np.linspace(-0.1, 0.1, 50), 0.0, 3.45),
                  dtype=mx.float64)
     v8 = mx.array([[0, 0, 0.1, 0.3, 8.8, 0.4, 0.3, 0]], dtype=mx.float64)

@@ -1,4 +1,4 @@
-"""Hybrid limb-darkening laws (metalplanet/hybrid.py): closed forms,
+"""Hybrid limb-darkening laws (elome/hybrid.py): closed forms,
 gradients, priors.
 
 Ground truth is a 30-digit mpmath direct integration
@@ -19,14 +19,14 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet
-from metalplanet import hybrid as H
-from metalplanet import ld
-from metalplanet.hybrid import (HYBRID2, HYBRID4, HYBRID5, LAWS, HybridLaw, flux_dev_hybrid,
+import elome
+from elome import hybrid as H
+from elome import ld
+from elome.hybrid import (HYBRID2, HYBRID4, HYBRID5, LAWS, HybridLaw, flux_dev_hybrid,
                                 hybrid_norms, ladder, lens_geometry, pole_col,
                                 shape_cols, shape_partials, w_to_c)
-from metalplanet.poly import sn_dev_poly
-from metalplanet.vjp import ld_basis_analytic
+from elome.poly import sn_dev_poly
+from elome.vjp import ld_basis_analytic
 
 mp = pytest.importorskip("mpmath")
 mp.mp.dps = 30
@@ -66,7 +66,7 @@ def phys_w(law, seed):
 
 
 def sp_same_hybrid2():
-    """Does the SquishierPlanet checkout carry MetalPlanet's hybrid2 pole?
+    """Does the SquishierPlanet checkout carry Elómë's hybrid2 pole?
     (Its hybrid2 is then the same law; a checkout with another pole cannot
     be compared on hybrid2.)"""
     from squishierplanet import laws as spl
@@ -140,7 +140,7 @@ class TestDefinitions:
 
     @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
     def test_hybrid2_pole_matches_squishierplanet(self):
-        """MetalPlanet's hybrid2 IS SquishierPlanet's: if either moves its
+        """Elómë's hybrid2 IS SquishierPlanet's: if either moves its
         pole this fails, rather than the cross-checks below quietly skipping
         hybrid2."""
         from squishierplanet import laws as spl
@@ -303,8 +303,8 @@ class TestColumns:
         1.6e-7 absolute (8e-11 of the column norm) at r = 0.8, eps = 0.0016,
         1e-13 from the contact, 1.5e-4 of the norm in the fp32 kernel.
         Every pole, 1e-13 .. 1e-6 from the contact, against the oracle."""
-        from metalplanet.metal import metal_available
-        from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+        from elome.metal import metal_available
+        from elome.metal_hybrid import flux_dev_metal_hybrid
         eps_all = sorted(set(ladder(3) + ladder(2) + (H.HYBRID2_EPS,)))
         zs = [1.0 - r + d for d in (1e-13, 1e-11, 1e-9, 1e-6)]
         for e in eps_all:
@@ -347,7 +347,7 @@ class TestFlux:
         from squishierplanet import laws as spl
         if name == "hybrid2" and not sp_same_hybrid2():
             pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not "
-                        "MetalPlanet's")
+                        "Elómë's")
         law = LAWS[name]
         zs = z_grid(r, law)
         for seed in (6, 7, 8):
@@ -625,7 +625,7 @@ class TestPriors:
         from squishierplanet import laws as spl
         if not sp_same_hybrid2():
             pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not "
-                        "MetalPlanet's (see the pole test)")
+                        "Elómë's (see the pole test)")
         rng = np.random.default_rng(1)
         q1, q2 = rng.random(100), rng.random(100)
         ref = spl.hybrid2_from_q(q1, q2)

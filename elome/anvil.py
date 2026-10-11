@@ -3,7 +3,7 @@ a synthetic transit-fitting target.
 
 ``make_quad_transit_flux`` returns the engine-contract model function
     model_fn(v: (n_chains, 8), x: (2, m)) -> (n_chains, m) flux deviation
-and is pure metalplanet (mlx + numpy only). ``make_target`` assembles the
+and is pure elome (mlx + numpy only). ``make_target`` assembles the
 full sampling problem (chunked likelihood + transform + synthetic data);
 the engine is imported lazily — as ``anvil`` if available, falling back
 to its former name ``applemcmc`` — so the core package stays standalone.
@@ -314,7 +314,7 @@ def make_transit_target(t, y, yerr, t0_guess, period_guess,
       perturbs around, and ``report_offset`` puts the reported values back
       on the original time system;
     * for ``eccentric=True`` the joint-constraint barrier is attached.
-      MetalPlanet clamps every numerical hazard, so an unphysical geometry
+      Elómë clamps every numerical hazard, so an unphysical geometry
       otherwise returns an ordinary finite log-likelihood and the chain
       samples an improper posterior in silence -- omitting the barrier is
       the single easiest way to get a wrong eccentric fit.
@@ -458,7 +458,7 @@ def ecc_constraint_penalty(v, strength: float = 1e6,
       * a real inclination     |cos i| <= 1
       * the eccentricity disc  secosw^2 + sesinw^2 <= e_max
 
-    MetalPlanet clamps every numerical hazard, so an unphysical proposal
+    Elómë clamps every numerical hazard, so an unphysical proposal
     otherwise returns an ordinary *finite* log-likelihood and the chain
     samples an improper posterior silently. A quadratic barrier is used
     rather than a -inf wall because hard walls make HMC diverge.

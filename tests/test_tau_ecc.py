@@ -22,8 +22,8 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-from metalplanet import api
-from metalplanet.metal import flux_dev_from_tau, metal_available
+from elome import api
+from elome.metal import flux_dev_from_tau, metal_available
 
 P = 3.4525
 EXP = 29.4 / 60.0 / 24.0
@@ -122,7 +122,7 @@ def test_contact_rule_against_the_exact_integral(name, g):
 
 def _bisect_contacts(g):
     """Every front-side z = 1 +- r crossing, by sweep + bisection in fp64."""
-    from metalplanet.anchored import separation_anchored
+    from elome.anchored import separation_anchored
     e = g["k"] ** 2 + g["h"] ** 2
     esw = g["h"] * math.sqrt(e)
     ci = g["b"] * (1 + esw) / (g["a"] * (1 - e * e))
@@ -156,8 +156,8 @@ def _bisect_contacts(g):
 @pytest.mark.parametrize("dtype", [mx.float64, mx.float32],
                          ids=["fp64", "fp32"])
 def test_contacts_are_exact(dtype):
-    from metalplanet.exposure import contact_offsets_anchored
-    from metalplanet.metal import _ecc_shape
+    from elome.exposure import contact_offsets_anchored
+    from elome.metal import _ecc_shape
     cases = list(GEOMS) + [
         dict(a=10.0, b=0.90, r=0.15, k=0.45, h=0.40),    # grazing
         dict(a=10.0, b=0.79, r=0.20, k=-0.3, h=0.55)]    # nearly grazing

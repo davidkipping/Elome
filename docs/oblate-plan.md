@@ -11,7 +11,7 @@ regimes (see "Cost review").
 The transit of an oblate planet, seen in projection as an ellipse, for the
 hybrid laws (`hybrid2`, `hybrid4`, `hybrid5`, and any `HybridLaw`).
 Gradients come in every parameter, and the `ld_basis` columns come with the
-same contract as the spherical path. MetalPlanet stays a forward model:
+same contract as the spherical path. Elómë stays a forward model:
 sampling, priors and the f/θ degeneracies belong to the caller (turin,
 anvil, SquishierPlanet).
 
@@ -40,7 +40,7 @@ Why not a single always-oblate mode, where spherical is just f = 0? Measured
 against SquishierPlanet's fp64 reference (scratchpad `oblate/jax_side.py`,
 `mp_side.py`):
 
-| | oblate reference (JAX) | MetalPlanet spherical |
+| | oblate reference (JAX) | Elómë spherical |
 |---|---|---|
 | flops per point (XLA count), hybrid2 / hybrid5 | 17k / 52k | ~a few hundred |
 | transcendentals per point, hybrid2 / hybrid5 | 1.0k / 2.4k | ~10-20 |
@@ -63,7 +63,7 @@ elliptic or Carlson integrals), so a spherical path is needed regardless.
 
 ## Invariants
 
-- **`f=None` is bitwise today's MetalPlanet.** That covers the 296-array
+- **`f=None` is bitwise today's Elómë.** That covers the 296-array
   release corpus, the kernel snapshot (146 arrays: outputs and VJPs for
   every spherical kernel family) and the hybrid graph snapshot (120
   arrays). No spherical kernel source changes; the oblate kernels are new
@@ -250,9 +250,9 @@ caller's: collapsed limb darkening (SquishierPlanet's path B) removes 4-5
 sampled dimensions and was measured there at 10-100x in ESS/s, which
 outweighs the kernel ratio.
 
-## Stage 1 -- fp64 reference in MetalPlanet (medium-large)
+## Stage 1 -- fp64 reference in Elómë (medium-large)
 
-New module `metalplanet/oblate.py`, an MLX graph in fp64 and fp32 that
+New module `elome/oblate.py`, an MLX graph in fp64 and fp32 that
 mirrors `hybrid.py`.
 
 - **Geometry.** (x0, y0) is the planet centre in the planet's principal
@@ -298,7 +298,7 @@ Tests (`tests/test_oblate.py`):
 
 ### Stage 1 results (done, 2026-10-10)
 
-`metalplanet/oblate.py` and `tests/test_oblate.py` (40 tests, all green;
+`elome/oblate.py` and `tests/test_oblate.py` (40 tests, all green;
 full fast suite 1856). The spherical paths are bitwise unchanged: the
 light-curve, kernel and hybrid-graph snapshots (296, 146 and 120 arrays) and
 the 18 kernel sources all equal v0.12.2's.
@@ -361,7 +361,7 @@ Findings:
 
 ### Stage 2 results (done, 2026-10-10)
 
-`metalplanet/oblate_tau.py`, the `f=`/`theta=` keywords on
+`elome/oblate_tau.py`, the `f=`/`theta=` keywords on
 `flux_dev_from_tau`, and `tests/test_oblate_tau.py` (51 tests) plus three
 oblate rows in `tests/test_entry_contract.py`. Fast suite: 1961 passed,
 3 skipped (the oblate rows' kernel-dispatch checks: no kernel yet). The
@@ -447,7 +447,7 @@ snapshot bitwise.
 
 ### Stage 3 results (done, 2026-10-10)
 
-`metalplanet/metal_oblate.py`, `tests/test_oblate_metal.py` (41 tests); the
+`elome/metal_oblate.py`, `tests/test_oblate_metal.py` (41 tests); the
 three oblate rows of `tests/test_entry_contract.py` now reach their own
 kernel family (dispatch spy, GPU compile). Fast suite 2003 passed. All four
 bitwise gates equal v0.12.2.
@@ -515,7 +515,7 @@ bitwise gates equal v0.12.2.
 - **`benchmarks/bench_oblate.py`**, subprocess-isolated and interleaved, run
   on a quiet machine.
 - **A reply to SquishierPlanet** against its brief. The brief asks for
-  bitwise agreement with MetalPlanet 0.10.7 at f=None; 0.12.x is the
+  bitwise agreement with Elómë 0.10.7 at f=None; 0.12.x is the
   baseline now, since hybrid2's pole has changed.
 
 ### Stage 4 results (done, 2026-10-10; release pending)

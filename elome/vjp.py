@@ -195,7 +195,7 @@ def _shape(x):
 
 
 # The public graph entries: the custom functions above, behind the data
-# contract (metalplanet.dtypes). Calls that already worked run unchanged.
+# contract (elome.dtypes). Calls that already worked run unchanged.
 
 @fp64_on_cpu(any_arg=True)
 def flux_dev_analytic(z, r, u1, u2) -> mx.array:

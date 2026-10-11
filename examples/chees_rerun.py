@@ -29,7 +29,7 @@ import time
 import mlx.core as mx
 import numpy as np
 
-from metalplanet.anvil import PARAM_NAMES, import_engine, make_target
+from elome.anvil import PARAM_NAMES, import_engine, make_target
 
 engine, _ = import_engine()
 

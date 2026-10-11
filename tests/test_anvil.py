@@ -12,9 +12,9 @@ import mlx.core as mx
 import numpy as np
 import pytest
 
-from metalplanet.anvil import import_engine
-from metalplanet.anvil import make_quad_transit_flux, make_target
-from metalplanet.orbit import epoch_center_times
+from elome.anvil import import_engine
+from elome.anvil import make_quad_transit_flux, make_target
+from elome.orbit import epoch_center_times
 
 applemcmc, _ = import_engine()
 

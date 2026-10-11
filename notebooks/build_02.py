@@ -33,7 +33,7 @@ packages that compose without any glue code:
 
 | package | role |
 |---|---|
-| **MetalPlanet** | the transit, as the *mean model* |
+| **Elómë** | the transit, as the *mean model* |
 | **anvil-gp** | a Gaussian-process likelihood for the correlated residual |
 | **anvil** | the sampler that moves all the parameters together |
 
@@ -54,7 +54,7 @@ Expect this notebook to take about two to three minutes, most of it the fit.
 md("""
 ## 0. Setup
 
-`anvilgp` must be installed alongside `metalplanet` and `anvil`.
+`anvilgp` must be installed alongside `elome` and `anvil`.
 """)
 
 code("""
@@ -71,11 +71,11 @@ from anvilgp.anvil import make_target
 from anvilgp.oracle import sample_ssm
 from anvilgp.priors import SpecHint
 
-import metalplanet
-from metalplanet.anvil import (DEFAULT_BOUNDS, PARAM_NAMES,
+import elome
+from elome.anvil import (DEFAULT_BOUNDS, PARAM_NAMES,
                                make_quad_transit_flux)
-from metalplanet.ld import u_to_q_np
-from metalplanet.orbit import epoch_center_times
+from elome.ld import u_to_q_np
+from elome.orbit import epoch_center_times
 
 try:
     import matplotlib.pyplot as plt
@@ -84,7 +84,7 @@ except ImportError:
     HAVE_PLT = False
     print("matplotlib not installed - figures skipped, numbers still print")
 
-print("MetalPlanet", metalplanet.__version__)
+print("Elómë", elome.__version__)
 print("GP terms available:", [n for n in dir(ag) if n.endswith("Term")
                               and n != "Term"])
 """)
@@ -92,7 +92,7 @@ print("GP terms available:", [n for n in dir(ag) if n.endswith("Term")
 md(r"""
 ## 1. The key idea: the contract already matches
 
-MetalPlanet's engine-facing model is
+Elómë's engine-facing model is
 
 ```python
 model_fn(v, x) -> (n_chains, n_data)
@@ -105,7 +105,7 @@ epoch-centred time array. anvil-gp's mean-model hook wants
 mean_fn(params, x_mean) -> (n_chains, n_data)
 ```
 
-These are the same signature. So MetalPlanet's model **is** anvil-gp's mean
+These are the same signature. So Elómë's model **is** anvil-gp's mean
 function — you pass it straight in, with no adapter and no wrapper. The mean
 model's parameters take the leading columns of the sampled vector and the GP's
 own parameters follow.
@@ -129,7 +129,7 @@ state-space model in O(n) — a dense Cholesky at these sizes would be
 prohibitive.
 
 Note the time system: absolute BJD near 2.457e6, which **cannot** be
-represented finely enough in float32. MetalPlanet's `epoch_center_times`
+represented finely enough in float32. Elómë's `epoch_center_times`
 reduces it on the host in float64 to (per-orbit residual, orbit number) before
 anything reaches the GPU.
 """)
@@ -163,7 +163,7 @@ rng = np.random.default_rng(7)
 variability = sample_ssm(ag.SHOTerm(), [SIGMA_TRUE, RHO_TRUE, Q_TRUE],
                          dt, N_DATA, rng)
 white = rng.standard_normal(N_DATA) * np.sqrt(YERR**2 + JITTER_TRUE**2)
-y_fit = transit + variability + white     # flux - 1, MetalPlanet's convention
+y_fit = transit + variability + white     # flux - 1, Elómë's convention
 
 print(f"{N_DATA:,} points over {BASELINE:g} d, cadence {dt*24*60:.2f} min")
 print(f"transit depth      {-transit.min()*1e6:6.0f} ppm "
@@ -193,10 +193,10 @@ md(r"""
 
 Three arguments do the coupling:
 
-* `mean_fn=model_fn` — MetalPlanet's model, unmodified;
+* `mean_fn=model_fn` — Elómë's model, unmodified;
 * `x_mean=x64` — the epoch-centred times it expects;
 * `mean_specs=[...]` — one `SpecHint` per transit parameter, giving its name
-  and bounds. MetalPlanet ships `PARAM_NAMES` and `DEFAULT_BOUNDS` so you do
+  and bounds. Elómë ships `PARAM_NAMES` and `DEFAULT_BOUNDS` so you do
   not have to invent them.
 
 `make_target` then adds the GP's own parameters, picks sensible priors and
@@ -211,14 +211,14 @@ specs = [SpecHint(name, lo=DEFAULT_BOUNDS[name][0],
 gt = make_target(
     ag.SHOTerm(),                  # the GP kernel
     t_model, y_fit, np.full(N_DATA, YERR),
-    mean_fn=model_fn,              # <- MetalPlanet, straight in
+    mean_fn=model_fn,              # <- Elómë, straight in
     x_mean=x64,
     mean_specs=specs,
     policy=GPPolicy(metal=True),
 )
 
 print(f"{gt.transform.dim} parameters sampled jointly:")
-print("  transit (MetalPlanet):", PARAM_NAMES)
+print("  transit (Elómë):", PARAM_NAMES)
 print("  GP + noise (anvil-gp):", [n for n in gt.names
                                    if n not in PARAM_NAMES])
 ok, why = gt.loglike.metal_eligible()
@@ -326,7 +326,7 @@ flat = gt.transform.model_np(res.get_chain(flat=True).astype(np.float64))
 natural = gt.natural(flat)
 
 print(f"{'parameter':>12s} {'median':>13s} {'sd':>11s} {'truth':>13s} {'z':>7s}")
-print("  -- transit (MetalPlanet) " + "-"*44)
+print("  -- transit (Elómë) " + "-"*44)
 for i, name in enumerate(PARAM_NAMES):
     v = flat[:, i]
     z = (np.median(v) - truth_model[i]) / v.std()
@@ -436,7 +436,7 @@ than silently falling back.
 
 ## Where to go next
 
-* `notebooks/01_metalplanet_with_anvil.ipynb` — the transit-only fit, and the
+* `notebooks/01_elome_with_anvil.ipynb` — the transit-only fit, and the
   forward-model tour.
 * anvil-gp's `examples/hotjupiter_gp_joint.py` — this fit with the
   cross-sampler agreement check, at full size.

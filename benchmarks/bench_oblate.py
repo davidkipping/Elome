@@ -38,7 +38,7 @@ WEIGHTS = {"hybrid2": [0.3, 0.2], "hybrid4": [0.2, 0.2, 0.1, 0.1],
 def worker(route, grad, n, m, integration, reps):
     import numpy as np
     import mlx.core as mx
-    from metalplanet.metal import flux_dev_from_tau
+    from elome.metal import flux_dev_from_tau
 
     rng = np.random.default_rng(11)
     tau = np.linspace(-0.14, 0.14, m)[None, :] + np.zeros((n, 1))

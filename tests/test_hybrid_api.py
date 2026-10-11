@@ -14,11 +14,11 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet
+import elome
 from hybrid_weights import phys_w
-from metalplanet import ld
-from metalplanet.hybrid import LAWS, flux_dev_hybrid
-from metalplanet.metal import metal_available
+from elome import ld
+from elome.hybrid import LAWS, flux_dev_hybrid
+from elome.metal import metal_available
 
 T = np.linspace(-0.15, 0.15, 601)
 P, A, INC, RP = 3.45, 8.8, 87.0, 0.1
@@ -29,7 +29,7 @@ NAMES = list(WEIGHTS)
 
 
 def params(law, u=None, **kw):
-    p = metalplanet.TransitParams()
+    p = elome.TransitParams()
     d = dict(t0=0.0, per=P, rp=RP, a=A, inc=INC, ecc=0.0, w=90.0,
              limb_dark=law, u=list(WEIGHTS[law]) if u is None else list(u))
     d.update(kw)
@@ -47,7 +47,7 @@ def circular_z(t, t0=0.0, per=P, a=A, inc=INC):
 
 @pytest.mark.parametrize("law", NAMES)
 def test_light_curve_is_flux_dev_hybrid_on_the_orbit(law):
-    m = metalplanet.TransitModel(params(law), T)
+    m = elome.TransitModel(params(law), T)
     got = m.light_curve(params(law))
     z, front = circular_z(T)
     with mx.stream(mx.cpu):
@@ -60,13 +60,13 @@ def test_light_curve_is_flux_dev_hybrid_on_the_orbit(law):
 
 @pytest.mark.parametrize("law", NAMES)
 def test_weights_update_without_rebuild(law):
-    m = metalplanet.TransitModel(params(law), T)
+    m = elome.TransitModel(params(law), T)
     f1 = m.light_curve(params(law))
     u = list(WEIGHTS[law])
     u[0] += 0.3
     f2 = m.light_curve(params(law, u=u))
     assert not np.allclose(f1, f2)
-    assert np.array_equal(f2, metalplanet.TransitModel(params(law, u=u), T)
+    assert np.array_equal(f2, elome.TransitModel(params(law, u=u), T)
                           .light_curve(params(law, u=u)))
 
 
@@ -74,8 +74,8 @@ def test_weights_update_without_rebuild(law):
 def test_wrong_or_changed_count_raises(law):
     n = LAWS[law].n_w
     with pytest.raises(ValueError, match=f"{law} takes {n} weights"):
-        metalplanet.TransitModel(params(law, u=[0.1] * (n + 1)), T)
-    m = metalplanet.TransitModel(params(law), T)
+        elome.TransitModel(params(law, u=[0.1] * (n + 1)), T)
+    m = elome.TransitModel(params(law), T)
     with pytest.raises(ValueError, match="coefficient count changed"):
         m.light_curve(params(law, u=[0.1] * (n - 1)))
     with pytest.raises(ValueError, match="law changed"):
@@ -85,7 +85,7 @@ def test_wrong_or_changed_count_raises(law):
 @pytest.mark.parametrize("law", NAMES)
 def test_eccentric_runs(law):
     p = params(law, ecc=0.3, w=63.0)
-    m = metalplanet.TransitModel(p, T)
+    m = elome.TransitModel(p, T)
     f = m.light_curve(p)
     assert f.min() < 0.99 and np.isfinite(f).all()
     assert list(m._compiled) == [(False, False)]          # fp64: the graph
@@ -103,8 +103,8 @@ MODES = {"plain": {}, "contact": dict(exp_time=EXP, integration="contact"),
 def kernel_spy():
     """Records, per trace of the hybrid z-kernel entry point, whether the
     GPU stream was active -- i.e. whether that trace took the kernel."""
-    import metalplanet.api as api
-    from metalplanet import metal as M
+    import elome.api as api
+    from elome import metal as M
     orig, calls = api.flux_dev_metal_hybrid, []
 
     def spy(z, r, law, u, basis=False):
@@ -129,14 +129,14 @@ def test_fp32_gpu_model_runs_the_fused_kernel(law, mode, ecc):
     The cache keys are the quadratic law's: the z-kernel decision lives in
     the trace, not the key."""
     p = params(law, ecc=ecc, w=63.0)
-    m = metalplanet.TransitModel(p, T, dtype=mx.float32, **MODES[mode])
+    m = elome.TransitModel(p, T, dtype=mx.float32, **MODES[mode])
     with kernel_spy() as calls:
         got = m.light_curve(p)
     assert calls == [True]
     assert list(m._compiled) == [(ecc == 0.0, False)]
-    graph = metalplanet.TransitModel(p, T, dtype=mx.float32, use_metal=False,
+    graph = elome.TransitModel(p, T, dtype=mx.float32, use_metal=False,
                                      **MODES[mode]).light_curve(p)
-    f64 = metalplanet.TransitModel(p, T, **MODES[mode]).light_curve(p)
+    f64 = elome.TransitModel(p, T, **MODES[mode]).light_curve(p)
     assert np.abs(got - graph).max() < 1e-6
     assert np.abs(got - f64).max() < 2e-6
 
@@ -149,7 +149,7 @@ def test_fp32_light_curves_match_the_loop(law, mode):
     rng = np.random.default_rng(5)
     W = phys_w(law, rng, n)
     rp = np.linspace(0.08, 0.12, n)
-    m = metalplanet.TransitModel(params(law), T, dtype=mx.float32,
+    m = elome.TransitModel(params(law), T, dtype=mx.float32,
                                  **MODES[mode])
     pa = params(law)
     pa.rp, pa.u = rp, W
@@ -174,7 +174,7 @@ def test_a_cpu_stream_first_call_does_not_pin_the_graph(mode):
     point never called) is retraced on the GPU with the kernel. One cache
     key, two traces, two outcomes; the spy sees the GPU trace alone."""
     law = "hybrid5"
-    m = metalplanet.TransitModel(params(law), T, dtype=mx.float32,
+    m = elome.TransitModel(params(law), T, dtype=mx.float32,
                                  **MODES[mode])
     with kernel_spy() as calls:
         with mx.stream(mx.cpu):
@@ -192,7 +192,7 @@ def test_float_radius_with_per_set_weights_takes_the_kernel_path():
     kernel as is (0.10.1 reshaped it unguarded; mx.reshape rejects
     floats). Every frontend route casts rp to an array before _photom,
     so this guards the direct-call contract, not a frontend regression."""
-    m = metalplanet.TransitModel(params("hybrid5"), T, dtype=mx.float32)
+    m = elome.TransitModel(params("hybrid5"), T, dtype=mx.float32)
     z = mx.array(np.linspace(0.5, 1.2, 8, dtype=np.float32)).reshape(2, 4)
     w = mx.array(np.array([WEIGHTS["hybrid5"]] * 2, np.float32))
     with kernel_spy() as calls:
@@ -208,7 +208,7 @@ def test_float_radius_with_per_set_weights_takes_the_kernel_path():
 def test_one_weight_row_broadcasts_on_the_kernel_route():
     """A (1, n_w) weight row with n > 1 rows of z: the kernel entry point
     broadcasts it (0.10.3 reshaped it by the z row count and raised)."""
-    m = metalplanet.TransitModel(params("hybrid4"), T, dtype=mx.float32)
+    m = elome.TransitModel(params("hybrid4"), T, dtype=mx.float32)
     z = mx.array(np.linspace(0.5, 1.2, 8, dtype=np.float32)).reshape(2, 4)
     w1 = mx.array(np.array([WEIGHTS["hybrid4"]], np.float32))        # (1, 4)
     rp = mx.array([0.1, 0.11], dtype=mx.float32)
@@ -226,8 +226,8 @@ def test_one_set_on_1d_z_is_one_kernel_row(wshape):
     """A scalar radius with one set of weights on (m,) separations is one
     (1, m) row of the kernel grid, not m single-point rows (0.10.4 sent a
     (1, n_w) row down the batched branch with n = m)."""
-    import metalplanet.metal_hybrid as MH
-    m = metalplanet.TransitModel(params("hybrid4"), T, dtype=mx.float32)
+    import elome.metal_hybrid as MH
+    m = elome.TransitModel(params("hybrid4"), T, dtype=mx.float32)
     z = mx.array(np.linspace(0.5, 1.2, 8, dtype=np.float32))
     w = mx.array(np.reshape(WEIGHTS["hybrid4"], wshape), dtype=mx.float32)
     shapes, orig = [], MH._z_core
@@ -260,8 +260,8 @@ def test_fp32_cpu_stream_fallback_is_the_graph_bitwise(law, mode):
     sides on the CPU stream: the same graph rounds differently on the two
     devices, and that is not what is under test."""
     p = params(law)
-    m = metalplanet.TransitModel(p, T, dtype=mx.float32, **MODES[mode])
-    g = metalplanet.TransitModel(p, T, dtype=mx.float32, use_metal=False,
+    m = elome.TransitModel(p, T, dtype=mx.float32, **MODES[mode])
+    g = elome.TransitModel(p, T, dtype=mx.float32, use_metal=False,
                                  **MODES[mode])
     with kernel_spy() as calls:
         with mx.stream(mx.cpu):
@@ -281,7 +281,7 @@ def test_fp32_light_curve_mx_gradients_through_the_kernel(law):
     ct = np.random.default_rng(6).normal(size=T.size)
 
     def grads(dtype):
-        m = metalplanet.TransitModel(params(law), T, dtype=dtype)
+        m = elome.TransitModel(params(law), T, dtype=dtype)
         ctx = mx.stream(mx.cpu) if dtype == mx.float64 else mx.stream(mx.gpu)
         with ctx:
             c = mx.array(ct, dtype=dtype)
@@ -308,7 +308,7 @@ def test_fp32_light_curve_mx_gradients_through_the_kernel(law):
 @pytest.mark.skipif(not metal_available(), reason="Metal unavailable")
 def test_array_eccentricity_route_uses_the_kernel_too():
     law = "hybrid4"
-    m = metalplanet.TransitModel(params(law, ecc=0.3, w=63.0), T,
+    m = elome.TransitModel(params(law, ecc=0.3, w=63.0), T,
                                  dtype=mx.float32)
     with kernel_spy() as calls:
         out = np.asarray(m.light_curve_mx(params(law, ecc=mx.array(0.3),
@@ -325,7 +325,7 @@ def test_contact_integration(law):
     figure is 9e-8 at n_gl = 5), and with a heavy supersampling to the
     latter's own O(1/N) accuracy."""
     def lc(**kw):
-        return metalplanet.TransitModel(params(law), T, exp_time=EXP,
+        return elome.TransitModel(params(law), T, exp_time=EXP,
                                         **kw).light_curve(params(law))
     c7 = lc(integration="contact", n_gl=7)
     c40 = lc(integration="contact", n_gl=40)
@@ -342,7 +342,7 @@ def test_light_curves_per_set_weights(law, form):
     rng = np.random.default_rng(1)
     W = phys_w(law, rng, n)
     rp = np.linspace(0.08, 0.12, n)
-    m = metalplanet.TransitModel(params(law), T)
+    m = elome.TransitModel(params(law), T)
     if form == "sequence":
         got = m.light_curves([params(law, u=W[j], rp=float(rp[j]))
                               for j in range(n)])
@@ -358,7 +358,7 @@ def test_light_curves_per_set_weights(law, form):
 
 @pytest.mark.parametrize("law", NAMES)
 def test_light_curves_contact_mode(law):
-    m = metalplanet.TransitModel(params(law), T, exp_time=EXP,
+    m = elome.TransitModel(params(law), T, exp_time=EXP,
                                  integration="contact", n_gl=7)
     ps = [params(law, rp=r) for r in (0.08, 0.1, 0.12)]
     got = m.light_curves(ps)
@@ -371,8 +371,8 @@ def test_fp32_model_matches_fp64(law):
     if not metal_available():
         pytest.skip("Metal unavailable")
     p = params(law)
-    f32 = metalplanet.TransitModel(p, T, dtype=mx.float32).light_curve(p)
-    f64 = metalplanet.TransitModel(p, T).light_curve(p)
+    f32 = elome.TransitModel(p, T, dtype=mx.float32).light_curve(p)
+    f64 = elome.TransitModel(p, T).light_curve(p)
     assert np.abs(f32 - f64).max() < 2e-6
 
 
@@ -380,7 +380,7 @@ def test_fp32_model_matches_fp64(law):
 def test_light_curve_mx_gradient_in_every_weight(law):
     """light_curve_mx differentiates in each w_j through the affine
     shape map; FD in fp64 on the CPU."""
-    m = metalplanet.TransitModel(params(law), T)
+    m = elome.TransitModel(params(law), T)
     n = LAWS[law].n_w
     w0 = np.array(WEIGHTS[law])
     ct = np.random.default_rng(2).normal(size=T.size)
@@ -406,9 +406,9 @@ def test_light_curve_mx_gradient_in_every_weight(law):
 @pytest.mark.parametrize("law", NAMES)
 def test_secondary_eclipse_ignores_limb_darkening(law):
     p = params(law, fp=1e-3, t_secondary=P / 2)
-    m = metalplanet.TransitModel(p, T + P / 2, transittype="secondary")
+    m = elome.TransitModel(p, T + P / 2, transittype="secondary")
     q = params("quadratic", u=[0.4, 0.25], fp=1e-3, t_secondary=P / 2)
-    mq = metalplanet.TransitModel(q, T + P / 2, transittype="secondary")
+    mq = elome.TransitModel(q, T + P / 2, transittype="secondary")
     assert np.array_equal(m.light_curve(p), mq.light_curve(q))
 
 
@@ -419,7 +419,7 @@ def test_priors_feed_the_model():
     w2 = ld.hybrid2_from_q_np(rng.random(), rng.random())
     for law, w in (("hybrid5", w5), ("hybrid2", np.asarray(w2))):
         p = params(law, u=w)
-        f = metalplanet.TransitModel(p, T).light_curve(p)
+        f = elome.TransitModel(p, T).light_curve(p)
         assert np.isfinite(f).all() and f.min() < 0.99 and f.max() <= 1.0
 
 
@@ -429,8 +429,8 @@ def test_priors_feed_the_model():
 # ---------------------------------------------------------------------------
 
 CUSTOM = {
-    "hybrid2-type": metalplanet.HybridLaw("custom2", [0.15], [[1, -1, 0]]),
-    "two-pole": metalplanet.HybridLaw("custom3", (0.05, 0.5), ((1, 0, -1),)),
+    "hybrid2-type": elome.HybridLaw("custom2", [0.15], [[1, -1, 0]]),
+    "two-pole": elome.HybridLaw("custom3", (0.05, 0.5), ((1, 0, -1),)),
 }
 
 
@@ -445,7 +445,7 @@ def test_transit_model_takes_a_hybrid_law_object(which, dtype):
     w = phys_w(law, np.random.default_rng(3))
     p = params("hybrid2")
     p.limb_dark, p.u = law, list(w)
-    m = metalplanet.TransitModel(p, T, dtype=dtype)
+    m = elome.TransitModel(p, T, dtype=dtype)
     f = m.light_curve(p)
     z, front = circular_z(T)
     with mx.stream(mx.cpu):
@@ -467,24 +467,24 @@ def test_an_equal_law_object_is_the_same_law():
     law = CUSTOM["hybrid2-type"]
     p = params("hybrid2")
     p.limb_dark, p.u = law, [0.3, 0.2]
-    m = metalplanet.TransitModel(p, T)
-    p.limb_dark = metalplanet.HybridLaw("custom2", (0.15,), ((1.0, -1.0, 0.0),))
+    m = elome.TransitModel(p, T)
+    p.limb_dark = elome.HybridLaw("custom2", (0.15,), ((1.0, -1.0, 0.0),))
     m.light_curve(p)
-    p.limb_dark = metalplanet.HybridLaw("custom2", (0.2,), ((1.0, -1.0, 0.0),))
+    p.limb_dark = elome.HybridLaw("custom2", (0.2,), ((1.0, -1.0, 0.0),))
     with pytest.raises(ValueError, match="law changed"):
         m.light_curve(p)
 
 
 def test_a_law_registered_after_import_is_supported():
-    from metalplanet import hybrid as Hm
-    law = metalplanet.HybridLaw("late2", (0.25,), ((1.0, -1.0, 0.0),))
+    from elome import hybrid as Hm
+    law = elome.HybridLaw("late2", (0.25,), ((1.0, -1.0, 0.0),))
     Hm.LAWS["late2"] = law
     try:
         p = params("hybrid2")
         p.limb_dark, p.u = "late2", [0.3, 0.2]
-        a = metalplanet.TransitModel(p, T).light_curve(p)
+        a = elome.TransitModel(p, T).light_curve(p)
         p.limb_dark = law
-        b = metalplanet.TransitModel(p, T).light_curve(p)
+        b = elome.TransitModel(p, T).light_curve(p)
         assert np.array_equal(a, b)
     finally:
         del Hm.LAWS["late2"]
@@ -492,14 +492,14 @@ def test_a_law_registered_after_import_is_supported():
 
 
 def test_a_name_and_its_law_object_are_one_law():
-    """Built with "hybrid2", called with metalplanet.HYBRID2 (and the
+    """Built with "hybrid2", called with elome.HYBRID2 (and the
     reverse): the same law, not "law changed" (0.12.1 compared raw
     fields)."""
-    for build, call in (("hybrid2", metalplanet.HYBRID2),
-                        (metalplanet.HYBRID2, "hybrid2")):
+    for build, call in (("hybrid2", elome.HYBRID2),
+                        (elome.HYBRID2, "hybrid2")):
         p = params("hybrid2")
         p.limb_dark = build
-        m = metalplanet.TransitModel(p, T)
+        m = elome.TransitModel(p, T)
         a = m.light_curve(p)
         p.limb_dark = call
         assert np.array_equal(m.light_curve(p), a)
@@ -509,15 +509,15 @@ def test_a_model_keeps_its_law_when_the_registry_changes():
     """The law is resolved once, at construction: re-binding or deleting
     the name later cannot make one model trace two laws (0.12.1 re-read the
     registry on every new graph)."""
-    from metalplanet import hybrid as Hm
-    law = metalplanet.HybridLaw("x", (0.2,), ((1.0, -1.0, 0.0),))
+    from elome import hybrid as Hm
+    law = elome.HybridLaw("x", (0.2,), ((1.0, -1.0, 0.0),))
     Hm.LAWS["x"] = law
     try:
         p = params("hybrid2")
         p.limb_dark, p.u = "x", [0.3, 0.2]
-        m = metalplanet.TransitModel(p, T)
+        m = elome.TransitModel(p, T)
         circ = m.light_curve(p)
-        Hm.LAWS["x"] = metalplanet.HybridLaw("x", (0.5,), ((1.0, -1.0, 0.0),))
+        Hm.LAWS["x"] = elome.HybridLaw("x", (0.5,), ((1.0, -1.0, 0.0),))
         with pytest.raises(ValueError, match="law changed"):
             m.light_curve(p)                       # "x" now means another law
         p.limb_dark = law
@@ -526,7 +526,7 @@ def test_a_model_keeps_its_law_when_the_registry_changes():
         pe = params("hybrid2", ecc=0.2, w=63.0)    # a graph traced only now
         pe.limb_dark, pe.u = law, [0.3, 0.2]
         e = m.light_curve(pe)
-        ref = metalplanet.TransitModel(pe, T).light_curve(pe)
+        ref = elome.TransitModel(pe, T).light_curve(pe)
         assert np.array_equal(e, ref)
     finally:
         Hm.LAWS.pop("x", None)

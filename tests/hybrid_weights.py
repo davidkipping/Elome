@@ -5,8 +5,8 @@ reaching negative weights, for a hybrid2-type law; the simplex otherwise."""
 
 import numpy as np
 
-from metalplanet import ld
-from metalplanet.hybrid import get_law
+from elome import ld
+from elome.hybrid import get_law
 
 
 def phys_w(law, rng, n=None):

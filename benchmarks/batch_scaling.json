@@ -1,6 +1,6 @@
 [
  {
-  "code": "metalplanet_gpu",
+  "code": "elome_gpu",
   "mode": "batch",
   "n": 0,
   "threads": 1,
@@ -20,7 +20,7 @@
   "npv": 64
  },
  {
-  "code": "metalplanet_gpu",
+  "code": "elome_gpu",
   "mode": "batch",
   "n": 0,
   "threads": 1,
@@ -40,7 +40,7 @@
   "npv": 256
  },
  {
-  "code": "metalplanet_gpu",
+  "code": "elome_gpu",
   "mode": "batch",
   "n": 0,
   "threads": 1,
@@ -60,7 +60,7 @@
   "npv": 512
  },
  {
-  "code": "metalplanet_gpu",
+  "code": "elome_gpu",
   "mode": "batch",
   "n": 0,
   "threads": 1,
@@ -80,7 +80,7 @@
   "npv": 1024
  },
  {
-  "code": "metalplanet_gpu",
+  "code": "elome_gpu",
   "mode": "batch",
   "n": 0,
   "threads": 1,
@@ -100,7 +100,7 @@
   "npv": 2048
  },
  {
-  "code": "metalplanet_gpu",
+  "code": "elome_gpu",
   "mode": "batch",
   "n": 0,
   "threads": 1,

@@ -13,7 +13,7 @@ Capability notes (measured on this machine, macOS/arm64):
     pytransit     : numba threading (NUMBA_NUM_THREADS)
     exoplanet-core: single-threaded C++ ops loop
     jaxoplanet    : XLA CPU thread pool (not user-partitionable cleanly)
-    metalplanet   : MLX — one GPU (all cores; not partitionable) or CPU
+    elome   : MLX — one GPU (all cores; not partitionable) or CPU
     ellc          : needs a Fortran toolchain; unavailable without
                     gfortran (`brew install gcc` would enable it)
 """
@@ -29,50 +29,50 @@ from scenario import (A_RS, B_IMPACT, ECC, INC_DEG, INC_ECC_DEG,
 
 
 # ---------------------------------------------------------------------------
-# MetalPlanet
+# Elómë
 # ---------------------------------------------------------------------------
 
 def _mp_params():
-    import metalplanet
-    p = metalplanet.TransitParams()
+    import elome
+    p = elome.TransitParams()
     p.t0, p.per, p.rp, p.a, p.inc = T0, PER, RP, A_RS, INC_DEG
     p.ecc, p.w, p.u, p.limb_dark = 0.0, 90.0, [U1, U2], "quadratic"
     return p
 
 
-def metalplanet_fp64_prepare(n):
-    import metalplanet
+def elome_fp64_prepare(n):
+    import elome
     p = _mp_params()
-    m = metalplanet.TransitModel(p, time_grid(n))
+    m = elome.TransitModel(p, time_grid(n))
     m.light_curve(p)  # warm
     return (m, p)
 
 
-def metalplanet_fp64_run(state):
+def elome_fp64_run(state):
     m, p = state
     return m.light_curve(p)
 
 
-def metalplanet_fp32_prepare(n):
+def elome_fp32_prepare(n):
     import mlx.core as mx
-    import metalplanet
+    import elome
     p = _mp_params()
-    m = metalplanet.TransitModel(p, time_grid(n), dtype=mx.float32)
+    m = elome.TransitModel(p, time_grid(n), dtype=mx.float32)
     m.light_curve(p)
     return (m, p)
 
 
-def metalplanet_fp32_run(state):
+def elome_fp32_run(state):
     m, p = state
     return m.light_curve(p)
 
 
-def metalplanet_gpu_batch_prepare(_n=None):
+def elome_gpu_batch_prepare(_n=None):
     """Engine-contract batched model: (npv, 8) params x (2, npt) times,
-    fp32 on the GPU — MetalPlanet's design center."""
+    fp32 on the GPU — Elómë's design center."""
     import mlx.core as mx
-    from metalplanet.anvil import make_quad_transit_flux
-    from metalplanet.ld import u_to_q_np
+    from elome.anvil import make_quad_transit_flux
+    from elome.ld import u_to_q_np
     from scenario import BATCH_NPT, BATCH_NPV
 
     bp = batch_params()
@@ -90,7 +90,7 @@ def metalplanet_gpu_batch_prepare(_n=None):
     return (model, v_mx, x_mx, mx)
 
 
-def metalplanet_gpu_batch_run(state):
+def elome_gpu_batch_run(state):
     model, v, x, mx = state
     out = model(v, x)
     mx.eval(out)
@@ -289,7 +289,7 @@ def jaxoplanet_batch_run(state):
 # Eccentric variants. Every code solves Kepler's equation itself here, so
 # these measure the orbit solver as well as the photometry — exoplanet-core
 # and jaxoplanet through their own kepler() (which return (sin f, cos f)),
-# batman / PyTransit / MetalPlanet through their normal orbital-element
+# batman / PyTransit / Elómë through their normal orbital-element
 # interfaces.
 # ---------------------------------------------------------------------------
 
@@ -298,36 +298,36 @@ _COSI_ECC = math.cos(math.radians(INC_ECC_DEG))
 
 
 def _mp_params_ecc():
-    import metalplanet
-    p = metalplanet.TransitParams()
+    import elome
+    p = elome.TransitParams()
     p.t0, p.per, p.rp, p.a, p.inc = T0, PER, RP, A_RS, INC_ECC_DEG
     p.ecc, p.w, p.u, p.limb_dark = ECC, OMEGA_DEG, [U1, U2], "quadratic"
     return p
 
 
-def metalplanet_fp64_ecc_prepare(n):
-    import metalplanet
+def elome_fp64_ecc_prepare(n):
+    import elome
     p = _mp_params_ecc()
-    m = metalplanet.TransitModel(p, time_grid_ecc(n))
+    m = elome.TransitModel(p, time_grid_ecc(n))
     m.light_curve(p)
     return (m, p)
 
 
-def metalplanet_fp64_ecc_run(state):
+def elome_fp64_ecc_run(state):
     m, p = state
     return m.light_curve(p)
 
 
-def metalplanet_fp32_ecc_prepare(n):
+def elome_fp32_ecc_prepare(n):
     import mlx.core as mx
-    import metalplanet
+    import elome
     p = _mp_params_ecc()
-    m = metalplanet.TransitModel(p, time_grid_ecc(n), dtype=mx.float32)
+    m = elome.TransitModel(p, time_grid_ecc(n), dtype=mx.float32)
     m.light_curve(p)
     return (m, p)
 
 
-def metalplanet_fp32_ecc_run(state):
+def elome_fp32_ecc_run(state):
     m, p = state
     return m.light_curve(p)
 

@@ -18,7 +18,7 @@ import time
 import numpy as np
 import mlx.core as mx
 
-from metalplanet.anvil import import_engine, make_ecc_target, make_target
+from elome.anvil import import_engine, make_ecc_target, make_target
 
 engine, _ = import_engine()
 HERE = os.path.dirname(os.path.abspath(__file__))

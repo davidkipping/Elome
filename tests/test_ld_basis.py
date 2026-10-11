@@ -23,7 +23,7 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-from metalplanet.metal import flux_dev_from_tau, flux_dev_metal, metal_available
+from elome.metal import flux_dev_from_tau, flux_dev_metal, metal_available
 from test_tau_kernel import EXP, P, boundary_taus
 
 needs_metal = pytest.mark.skipif(not metal_available(),

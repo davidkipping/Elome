@@ -7,7 +7,7 @@
 > the same kernel with a per-chain fast path. These notes describe the
 > *direct* (E, e, w)
 > formulation that informed the design. The shipped kernel uses the
-> **transit-anchored** formulation instead (`metalplanet/anchored.py`),
+> **transit-anchored** formulation instead (`elome/anchored.py`),
 > which is algebraically equivalent — verified to 2.5e-15 in flux — but
 > keeps float32 gradients accurate as e -> 0. The backward formulas
 > below remain correct for the direct form and were the starting point

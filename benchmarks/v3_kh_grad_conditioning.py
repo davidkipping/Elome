@@ -2,8 +2,8 @@
 parameterization near e -> 0, through the production graph orbit path.
 Reference: same graph in fp64 on the CPU stream (Cody-Waite trig)."""
 import math, numpy as np, mlx.core as mx
-from metalplanet.kepler import separation_keplerian
-from metalplanet.trig import sincos
+from elome.kepler import separation_keplerian
+from elome.trig import sincos
 
 A, INC = 8.8, math.acos(0.3 / 8.8)
 phi = np.linspace(-0.12, 0.12, 4001)          # transit vicinity, rad

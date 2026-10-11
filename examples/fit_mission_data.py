@@ -16,9 +16,9 @@ import time
 import numpy as np
 import mlx.core as mx
 
-import metalplanet
-from metalplanet.anvil import import_engine, make_transit_target
-from metalplanet.ld import u_to_q_np
+import elome
+from elome.anvil import import_engine, make_transit_target
+from elome.ld import u_to_q_np
 
 engine, _ = import_engine()
 
@@ -27,10 +27,10 @@ T0, PER, RP, A, INC = 2500.123456, 4.2345, 0.085, 11.3, 88.6
 U1, U2, YERR = 0.42, 0.21, 3e-4
 rng = np.random.default_rng(7)
 t = 2500.0 + np.sort(rng.uniform(0.0, 27.0, 40_000))
-_p = metalplanet.TransitParams()
+_p = elome.TransitParams()
 _p.t0, _p.per, _p.rp, _p.a, _p.inc = T0, PER, RP, A, INC
 _p.ecc, _p.w, _p.u, _p.limb_dark = 0.0, 90.0, [U1, U2], "quadratic"
-truth_flux = metalplanet.TransitModel(_p, t).light_curve(_p)
+truth_flux = elome.TransitModel(_p, t).light_curve(_p)
 y = truth_flux + YERR * rng.standard_normal(t.size)
 yerr = np.full(t.size, YERR)
 # --------------------------------------------------------------------------

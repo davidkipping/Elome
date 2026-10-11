@@ -11,7 +11,7 @@ of about 8 minutes). Eclipsing WD + brown-dwarf and WD + M-dwarf systems
 reach total occultation (b < r - 1), where the white dwarf vanishes
 entirely for part of the event.
 
-MetalPlanet never claimed r > 1. `solution.py` states "Assumes 0 < r < 1
+Elómë never claimed r > 1. `solution.py` states "Assumes 0 < r < 1
 (no total occultation branch)", but nothing rejects a larger r.
 
 ## Baseline (measured 2026-10-10)

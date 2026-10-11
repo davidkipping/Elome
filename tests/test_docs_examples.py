@@ -9,8 +9,8 @@ import pytest
 
 emcee = pytest.importorskip("emcee")
 
-from metalplanet.anvil import import_engine, make_quad_transit_flux
-from metalplanet.orbit import epoch_center_times
+from elome.anvil import import_engine, make_quad_transit_flux
+from elome.orbit import epoch_center_times
 
 _, ChunkedGaussianLogLike = import_engine()
 

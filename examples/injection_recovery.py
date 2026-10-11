@@ -7,7 +7,7 @@ Acceptance criteria (the ones the trapezoid could not meet):
   * ESS/s comparison — on a smooth model HMC should win per-draw
     efficiency decisively.
 
-Run:  .venv/bin/python metalplanet/examples/injection_recovery.py
+Run:  .venv/bin/python elome/examples/injection_recovery.py
 """
 
 import time
@@ -15,11 +15,11 @@ import time
 import mlx.core as mx
 import numpy as np
 
-from metalplanet.anvil import import_engine
+from elome.anvil import import_engine
 applemcmc, _ = import_engine()
 diagnostics = applemcmc.diagnostics
 ess_bulk, split_rhat, summary = (diagnostics.ess_bulk, diagnostics.split_rhat, diagnostics.summary)
-from metalplanet.anvil import PARAM_NAMES, make_target
+from elome.anvil import PARAM_NAMES, make_target
 
 N_CHAINS = 1024
 

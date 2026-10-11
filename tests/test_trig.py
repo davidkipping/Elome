@@ -4,7 +4,7 @@ sin/cos) and its use in the orbit paths."""
 import mlx.core as mx
 import numpy as np
 
-from metalplanet.trig import sincos
+from elome.trig import sincos
 
 RNG = np.random.default_rng(61)
 

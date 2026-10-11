@@ -8,8 +8,8 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-from metalplanet import flux_dev, flux_dev_analytic
-from metalplanet.metal import flux_dev_metal, metal_available
+from elome import flux_dev, flux_dev_analytic
+from elome.metal import flux_dev_metal, metal_available
 from reference_limbdark import flux_quad_ref
 
 pytestmark = pytest.mark.skipif(not metal_available(),
@@ -207,7 +207,7 @@ class TestModelKernel:
     PERIOD_REF = 3.4565
 
     def _models(self):
-        from metalplanet.anvil import make_quad_transit_flux
+        from elome.anvil import make_quad_transit_flux
         return (make_quad_transit_flux(self.PERIOD_REF, core="metal"),
                 make_quad_transit_flux(self.PERIOD_REF, core="analytic"))
 
@@ -298,7 +298,7 @@ class TestSimdReduction:
 
     @staticmethod
     def _args(n, m, dt_value=None, span=0.5):
-        from metalplanet.anchored import pack_orbit_constants
+        from elome.anchored import pack_orbit_constants
         dt = (np.full(m, dt_value, np.float32) if dt_value is not None
               else np.linspace(-span, span, m).astype(np.float32))
         x2d = mx.array(np.vstack([dt, np.zeros(m, np.float32)]))
@@ -311,7 +311,7 @@ class TestSimdReduction:
     def test_all_out_of_transit_is_exactly_zero(self):
         """Every lane early-returns, so no simdgroup writes at all: the
         kernel's init_value is what makes the partials read as zero."""
-        from metalplanet.metal import make_model_core_metal
+        from elome.metal import make_model_core_metal
         args = self._args(4, 512, dt_value=0.5)
         core = make_model_core_metal(self.PREF)
 
@@ -350,8 +350,8 @@ class TestSimdReduction:
         """The e == 0 fast path is a per-chain branch. A batch mixing
         circular and eccentric chains must reproduce each chain exactly
         as it computes alone -- values and gradients."""
-        from metalplanet.anchored import pack_orbit_constants
-        from metalplanet.metal import make_model_core_metal
+        from elome.anchored import pack_orbit_constants
+        from elome.metal import make_model_core_metal
         core = make_model_core_metal(self.PREF)
         m = 2048
         dt = np.linspace(-0.5, 0.5, m).astype(np.float32)
@@ -387,7 +387,7 @@ class TestEccentricKernel:
     """v3: the transit-anchored eccentric orbit fused with the
     photometric core, plus its analytic VJP.
 
-    The graph path (metalplanet.anchored) is the reference; it is itself
+    The graph path (elome.anchored) is the reference; it is itself
     pinned against kepler.separation_keplerian and finite differences in
     tests/test_anchored.py, so kernel -> graph -> FD closes the chain.
     """
@@ -397,7 +397,7 @@ class TestEccentricKernel:
 
     @staticmethod
     def _core():
-        from metalplanet.metal import make_model_core_metal
+        from elome.metal import make_model_core_metal
         return make_model_core_metal(TestEccentricKernel.PREF)
 
     def _inputs(self, e, wdeg, n=4, m=2048, seed=2, f64=False):
@@ -418,7 +418,7 @@ class TestEccentricKernel:
                      arr(self.CI), arr(self.U1c), arr(self.U2c)]
 
     def _graph(self, x2d, t0, pof, r, a, k, h, ci, u1, u2):
-        from metalplanet.anchored import separation_anchored
+        from elome.anchored import separation_anchored
         dt = x2d[0][None, :]
         kk = x2d[1][None, :]
         P = (self.PREF + pof)[:, None]
@@ -431,7 +431,7 @@ class TestEccentricKernel:
         return mx.where(front & (z < 1.0 + r[:, None]), f, 0.0)
 
     def _kernel(self, x2d, t0, pof, r, a, k, h, ci, u1, u2):
-        from metalplanet.anchored import pack_orbit_constants
+        from elome.anchored import pack_orbit_constants
         return self._core()(x2d, t0, pof, r, a,
                             pack_orbit_constants(k, h, ci), u1, u2)
 
@@ -509,8 +509,8 @@ class TestEccentricKernel:
         """ecc / e0 / mtra seed only the Markley starter and the 2-pi
         fold; their exact gradient is zero and pack_orbit_constants
         detaches them, so the kernel must return zeros there."""
-        from metalplanet.anchored import pack_orbit_constants
-        from metalplanet.metal import _ORB_COLS
+        from elome.anchored import pack_orbit_constants
+        from elome.metal import _ORB_COLS
         x2d, args = self._inputs(0.3, 47.0, n=2, m=1024)
         t0, pof, r, a, k, h, ci, u1, u2 = args
         orb = pack_orbit_constants(k, h, ci)

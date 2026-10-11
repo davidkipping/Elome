@@ -100,6 +100,6 @@ Mirror `_ecc_kernel_usable` / the contact branch in `api.py`:
 Half a day including tests; the eccentric routing is a working template
 and this case is strictly simpler. The verdict stands: do it only if
 single-curve fp32 GPU throughput becomes a goal in itself. For sampling
-workloads it is irrelevant — `metalplanet.anvil` already uses the fused
+workloads it is irrelevant — `elome.anvil` already uses the fused
 kernel, and `TransitModel.light_curves` (v0.5.0) batches the frontend,
 which is worth ~112x where this is worth ~1.4x.

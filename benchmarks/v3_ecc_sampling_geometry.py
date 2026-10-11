@@ -19,7 +19,7 @@ so the comparison is like-for-like.
 import numpy as np
 import mlx.core as mx
 
-from metalplanet.anvil import (PARAM_NAMES_ECC, ecc_constraint_penalty,
+from elome.anvil import (PARAM_NAMES_ECC, ecc_constraint_penalty,
                                import_engine, make_ecc_target, make_target)
 
 engine, _ = import_engine()

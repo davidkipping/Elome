@@ -1,85 +1,47 @@
-"""MetalPlanet — analytic, differentiable transit light curves on Apple
-Silicon (MLX).
+"""Deprecated alias: MetalPlanet is now Elómë -- ``import elome``.
 
-Quadratic limb-darkened transits per Agol, Luger & Foreman-Mackey (2020),
-with a batman-style frontend for everyday use:
+Elómë (Quenya: Él "star" + lómë "dimness") is the same package under its
+new name. This shim keeps ``import metalplanet`` and every
+``metalplanet.<module>`` import working, as the very same objects, so
+code written against MetalPlanet runs unchanged; it warns
+(DeprecationWarning) and will be removed in a future release.
 
-    import metalplanet
-    params = metalplanet.TransitParams()
-    ...
-    m = metalplanet.TransitModel(params, t)
-    flux = m.light_curve(params)
-
-and a float32-conditioned batched backend (``metalplanet.anvil``) for
-GPU sampling with the anvil (formerly applemcmc) MCMC engine — which is
-an optional integration dependency; the core needs only mlx and numpy.
+An environment whose editable install predates the rename maps only the
+name ``metalplanet`` (to this folder); ``elome`` is then loaded from the
+folder beside it, without touching sys.path. Reinstalling
+(``pip install -e .``) registers ``elome`` itself.
 """
+import importlib
+import importlib.util
+import os
+import pkgutil
+import sys
+import warnings
 
-from .api import TransitModel, TransitParams
-from .ellip import cel, cel3
-from .flux import flux_dev, light_curve
-from .greens import greens_transform_np, quad_g_coeffs, quad_norm
-from .kepler import (kepler, kepler_E, kepler_E_sincos,
-                     separation_keplerian)
-from .anchored import anchor_constants, separation_anchored
-from .poly import flux_dev_poly, sn_dev_poly
-from .hybrid import (HYBRID2, HYBRID2_EPS, HYBRID4,
-                     HYBRID5, HybridLaw, LAWS as HYBRID_LAWS,
-                     flux_dev_hybrid, hybrid_norms, shape_cols)
-from .oblate import flux_dev_oblate, shape_cols_oblate
-from .oblate_tau import contact_offsets_oblate
-from .ld import (hybrid2_from_q, hybrid2_from_q_np, hybrid2_to_q_np,
-                 q_from_simplex_np, q_to_u, q_to_u_np, simplex_from_q,
-                 simplex_from_q_np, u_to_q_np)
-from .metal import flux_dev_from_tau, flux_dev_metal, metal_available
-from .solution import sn_dev, sn_dev_with_aux
-from .vjp import flux_dev_analytic
+warnings.warn(
+    "the 'metalplanet' package is now 'elome' (Elómë); `import metalplanet` "
+    "still works but will be removed in a future release -- use "
+    "`import elome`.", DeprecationWarning, stacklevel=2)
 
-__all__ = [
-    "TransitModel",
-    "TransitParams",
-    "cel",
-    "cel3",
-    "flux_dev",
-    "flux_dev_analytic",
-    "flux_dev_poly",
-    "sn_dev_poly",
-    "light_curve",
-    "flux_dev_from_tau",
-    "flux_dev_metal",
-    "metal_available",
-    "greens_transform_np",
-    "quad_g_coeffs",
-    "quad_norm",
-    "kepler",
-    "kepler_E",
-    "kepler_E_sincos",
-    "separation_keplerian",
-    "separation_anchored",
-    "anchor_constants",
-    "q_to_u",
-    "q_to_u_np",
-    "u_to_q_np",
-    "HybridLaw",
-    "HYBRID2",
-    "HYBRID2_EPS",
-    "flux_dev_oblate",
-    "shape_cols_oblate",
-    "contact_offsets_oblate",
-    "HYBRID4",
-    "HYBRID5",
-    "HYBRID_LAWS",
-    "flux_dev_hybrid",
-    "hybrid_norms",
-    "shape_cols",
-    "hybrid2_from_q",
-    "hybrid2_from_q_np",
-    "hybrid2_to_q_np",
-    "simplex_from_q",
-    "simplex_from_q_np",
-    "q_from_simplex_np",
-    "sn_dev",
-    "sn_dev_with_aux",
-]
+try:
+    import elome as _elome
+except ImportError:
+    _here = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
+        __file__))), "elome")
+    _spec = importlib.util.spec_from_file_location(
+        "elome", os.path.join(_here, "__init__.py"),
+        submodule_search_locations=[_here])
+    if _spec is None:
+        raise
+    _elome = importlib.util.module_from_spec(_spec)
+    sys.modules["elome"] = _elome
+    _spec.loader.exec_module(_elome)
 
-__version__ = "0.13.2"
+from elome import *  # noqa: E402,F401,F403
+from elome import __all__, __version__  # noqa: E402,F401
+
+# metalplanet.<module> is elome.<module> (one module object, shared caches)
+for _m in pkgutil.iter_modules(_elome.__path__):
+    _mod = importlib.import_module(f"elome.{_m.name}")
+    sys.modules[f"{__name__}.{_m.name}"] = _mod
+    globals()[_m.name] = _mod

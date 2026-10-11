@@ -16,8 +16,8 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-from metalplanet import api
-from metalplanet.metal import flux_dev_from_tau, metal_available
+from elome import api
+from elome.metal import flux_dev_from_tau, metal_available
 
 P = 3.4525
 EXP = 29.4 / 60.0 / 24.0          # Kepler long cadence, in days
@@ -449,8 +449,8 @@ class TestContract:
         flux_dev_metal with tau -> z folded in, to the standing
         kernel-vs-graph tolerance (the two compute z in a different
         order, so they are not bit-identical)."""
-        from metalplanet.metal import flux_dev_metal
-        from metalplanet.orbit import separation_circular
+        from elome.metal import flux_dev_metal
+        from elome.orbit import separation_circular
         n, m = 8, 2048
         tau = np.broadcast_to(np.linspace(-0.2, 0.2, m), (n, m)).copy()
         t = mx.array(tau, dtype=mx.float32)

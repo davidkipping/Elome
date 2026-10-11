@@ -12,8 +12,8 @@ import time
 import numpy as np
 import mlx.core as mx
 
-from metalplanet.metal import make_model_core_metal
-from metalplanet.anchored import pack_orbit_constants
+from elome.metal import make_model_core_metal
+from elome.anchored import pack_orbit_constants
 
 N, M, PREF, REPS = 1024, 65536, 3.456, 12
 

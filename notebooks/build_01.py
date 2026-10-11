@@ -1,6 +1,6 @@
-"""Regenerate notebooks/01_metalplanet_with_anvil.ipynb.
+"""Regenerate notebooks/01_elome_with_anvil.ipynb.
 
-    python notebooks/build_01.py notebooks/01_metalplanet_with_anvil.ipynb
+    python notebooks/build_01.py notebooks/01_elome_with_anvil.ipynb
 
 The notebook is generated rather than hand-edited so its prose and code stay
 reviewable as ordinary source in a diff. Every code cell is executed before
@@ -19,12 +19,12 @@ def md(text):   CELLS.append(("markdown", text.strip("\n")))
 def code(text): CELLS.append(("code", text.strip("\n")))
 
 md(r"""
-# MetalPlanet + anvil: modelling and fitting transits on Apple Silicon
+# Elómë + anvil: modelling and fitting transits on Apple Silicon
 
-**MetalPlanet** computes transit light curves: `(parameters, times) -> flux`,
+**Elómë** computes transit light curves: `(parameters, times) -> flux`,
 plus that map's analytic derivatives. It is *only* a forward model — no
 sampler, no likelihood, no fitting machinery. **anvil** is the MCMC engine.
-The dependency arrow points one way: anvil imports MetalPlanet, never the
+The dependency arrow points one way: anvil imports Elómë, never the
 reverse.
 
 This notebook covers:
@@ -47,7 +47,7 @@ figures, otherwise the numbers still print.
 md("""
 ## 0. Setup
 
-Two dtype/device regimes matter, and MetalPlanet picks between them for you:
+Two dtype/device regimes matter, and Elómë picks between them for you:
 
 | | where it runs | when to use it |
 |---|---|---|
@@ -65,7 +65,7 @@ import time
 import numpy as np
 import mlx.core as mx
 
-import metalplanet
+import elome
 
 try:
     import matplotlib.pyplot as plt
@@ -74,8 +74,8 @@ except ImportError:                      # the notebook works either way
     HAVE_PLT = False
     print("matplotlib not installed - figures are skipped, numbers still print")
 
-print("MetalPlanet", metalplanet.__version__)
-print("Metal kernel available:", metalplanet.metal_available())
+print("Elómë", elome.__version__)
+print("Metal kernel available:", elome.metal_available())
 """)
 
 md(r"""
@@ -92,7 +92,7 @@ inclination in degrees, `ecc`/`w` eccentricity and longitude of periastron,
 """)
 
 code("""
-params = metalplanet.TransitParams()
+params = elome.TransitParams()
 params.t0 = 0.0             # time of inferior conjunction [d]
 params.per = 3.456          # orbital period [d]
 params.rp = 0.1             # Rp / R*
@@ -104,7 +104,7 @@ params.u = [0.4, 0.25]      # quadratic limb darkening
 params.limb_dark = "quadratic"
 
 t = np.linspace(-0.15, 0.15, 1000)          # days from mid-transit
-model = metalplanet.TransitModel(params, t)
+model = elome.TransitModel(params, t)
 flux = model.light_curve(params)
 
 print(f"depth = {1 - flux.min():.6f}   out-of-transit flux = {flux.max():.1f}")
@@ -196,12 +196,12 @@ if HAVE_PLT:
     plt.figure(figsize=(7, 3.2))
 for law, u in (("uniform", []), ("linear", [0.5]), ("quadratic", [0.4, 0.25]),
                ("polynomial", [0.35, 0.2, 0.1, 0.05])):
-    p2 = metalplanet.TransitParams()
+    p2 = elome.TransitParams()
     for k in ("t0", "per", "rp", "a", "inc", "ecc", "w"):
         setattr(p2, k, getattr(params, k))
     p2.u, p2.limb_dark = u, law
     # the LAW is fixed per model, so each law needs its own TransitModel
-    f = metalplanet.TransitModel(p2, t).light_curve(p2)
+    f = elome.TransitModel(p2, t).light_curve(p2)
     print(f"{law:12s} (N={len(u)}): depth {1 - f.min():.5f}")
     if HAVE_PLT:
         plt.plot(t, f, lw=1.4, label=f"{law} (N={len(u)})")
@@ -232,22 +232,22 @@ and Gauss-Legendre on a smooth piece converges geometrically.
 
 code("""
 EXP = 0.0204                      # Kepler long cadence [d] = 29.4 min
-p3 = metalplanet.TransitParams()
+p3 = elome.TransitParams()
 for k in ("t0", "per", "rp", "a", "inc", "ecc", "w", "u", "limb_dark"):
     setattr(p3, k, getattr(params, k))
 t_lc = np.linspace(-0.15, 0.15, 400)
 
 # a trustworthy reference: a very high-order contact rule
-ref = metalplanet.TransitModel(p3, t_lc, exp_time=EXP,
+ref = elome.TransitModel(p3, t_lc, exp_time=EXP,
                                integration="contact", n_gl=40).light_curve(p3)
 
 print(f"{'method':<28}{'model evals/exposure':>22}{'max error':>13}")
 for n in (7, 101, 1001):
-    m = metalplanet.TransitModel(p3, t_lc, exp_time=EXP, supersample_factor=n)
+    m = elome.TransitModel(p3, t_lc, exp_time=EXP, supersample_factor=n)
     err = np.abs(m.light_curve(p3) - ref).max()
     print(f"{'supersample N=' + str(n):<28}{n:>22}{err:>13.2e}")
 for n_gl in (3, 5, 7):
-    m = metalplanet.TransitModel(p3, t_lc, exp_time=EXP,
+    m = elome.TransitModel(p3, t_lc, exp_time=EXP,
                                  integration="contact", n_gl=n_gl)
     err = np.abs(m.light_curve(p3) - ref).max()
     # five sub-intervals per window, n_gl nodes each
@@ -256,7 +256,7 @@ for n_gl in (3, 5, 7):
 
 code("""
 # what the smearing actually does to the curve
-sharp = metalplanet.TransitModel(p3, t_lc).light_curve(p3)
+sharp = elome.TransitModel(p3, t_lc).light_curve(p3)
 if HAVE_PLT:
     plt.figure(figsize=(7, 3.2))
     plt.plot(t_lc, sharp, lw=1.4, label="instantaneous")
@@ -288,7 +288,7 @@ rng = np.random.default_rng(0)
 n_sets = 2000
 sets = []
 for _ in range(n_sets):
-    q = metalplanet.TransitParams()
+    q = elome.TransitParams()
     q.t0, q.per, q.a = 0.0, 3.456, 8.8
     q.u, q.limb_dark = [0.4, 0.25], "quadratic"
     q.rp = 0.1 + 0.02 * rng.standard_normal()
@@ -298,7 +298,7 @@ for _ in range(n_sets):
     sets.append(q)
 
 # float32 on the GPU is the right regime for bulk evaluation
-m32 = metalplanet.TransitModel(sets[0], np.linspace(-0.15, 0.15, 301),
+m32 = elome.TransitModel(sets[0], np.linspace(-0.15, 0.15, 301),
                                dtype=mx.float32)
 m32.light_curves(sets[:8])                       # warm up the kernel
 
@@ -320,7 +320,7 @@ print(f"a loop (estimated) : {t_loop*1e3:8.0f} ms   ->  {t_loop/t_batched:.0f}x 
 md(r"""
 ## 6. Fitting real photometry with anvil
 
-Now the point of all this. `metalplanet.anvil.make_transit_target` turns
+Now the point of all this. `elome.anvil.make_transit_target` turns
 `(t, y, yerr)` into a ready-to-sample anvil target, and it owns the
 conditioning that the float32 sampling path depends on:
 
@@ -337,8 +337,8 @@ Replace that block with a real light curve and everything after it stands.
 """)
 
 code("""
-from metalplanet.anvil import import_engine, make_transit_target
-from metalplanet.ld import u_to_q_np
+from elome.anvil import import_engine, make_transit_target
+from elome.ld import u_to_q_np
 
 engine, _ = import_engine()          # anvil, imported lazily
 
@@ -347,10 +347,10 @@ T0_TRUE, PER_TRUE, RP_TRUE, A_TRUE, INC_TRUE = 2500.123456, 4.2345, 0.085, 11.3,
 U1_TRUE, U2_TRUE, YERR = 0.42, 0.21, 3e-4
 rng = np.random.default_rng(7)
 t_obs = 2500.0 + np.sort(rng.uniform(0.0, 27.0, 6_000))
-_p = metalplanet.TransitParams()
+_p = elome.TransitParams()
 _p.t0, _p.per, _p.rp, _p.a, _p.inc = T0_TRUE, PER_TRUE, RP_TRUE, A_TRUE, INC_TRUE
 _p.ecc, _p.w, _p.u, _p.limb_dark = 0.0, 90.0, [U1_TRUE, U2_TRUE], "quadratic"
-truth_curve = metalplanet.TransitModel(_p, t_obs).light_curve(_p)
+truth_curve = elome.TransitModel(_p, t_obs).light_curve(_p)
 y_obs = truth_curve + YERR * rng.standard_normal(t_obs.size)
 yerr_obs = np.full(t_obs.size, YERR)
 # --------------------------------------------------------------------------
@@ -445,7 +445,7 @@ print(engine.validate_precision(target.target, u_probe))
 md(r"""
 ### Sample
 
-MetalPlanet supplies analytic gradients, so gradient-based HMC is the natural
+Elómë supplies analytic gradients, so gradient-based HMC is the natural
 choice — that is the whole reason for the fused kernel. anvil's `ChEESHMC`
 adapts the trajectory length across an *ensemble* of chains running
 simultaneously on the GPU.
@@ -517,7 +517,7 @@ code("""
 if HAVE_PLT:
     # the fitted model over the folded data
     best = posterior.mean(axis=0)
-    pf = metalplanet.TransitParams()
+    pf = elome.TransitParams()
     pf.t0, pf.per, pf.rp = best[0], best[1], best[2]
     pf.a = best[4]
     pf.inc = math.degrees(math.acos(best[3] / best[4]))   # b = a cos i
@@ -525,7 +525,7 @@ if HAVE_PLT:
     u2_fit = math.sqrt(best[5])*(1 - 2*best[6])
     pf.ecc, pf.w, pf.u, pf.limb_dark = 0.0, 90.0, [u1_fit, u2_fit], "quadratic"
     t_fine = np.linspace(-0.2, 0.2, 800) + best[0]
-    model_fit = metalplanet.TransitModel(pf, t_fine).light_curve(pf)
+    model_fit = elome.TransitModel(pf, t_fine).light_curve(pf)
 
     ph_d = (t_obs - best[0] + 0.5*best[1]) % best[1] - 0.5*best[1]
     nb = 120
@@ -560,7 +560,7 @@ are added. Sampling in those coordinates rather than in `(e, w)` is standard
 practice: it has no coordinate singularity at `e = 0` and a uniform prior on
 the disc gives a uniform prior on `e`.
 
-**One thing you must not skip.** MetalPlanet clamps every numerical hazard, so
+**One thing you must not skip.** Elómë clamps every numerical hazard, so
 a geometry that is *unphysical* — a planet whose periastron is inside the star,
 or an impact parameter implying `|cos i| > 1` — still returns a perfectly
 ordinary finite log-likelihood. Those constraints couple several parameters,
@@ -571,7 +571,7 @@ posterior and nothing will complain.
 """)
 
 code("""
-from metalplanet.anvil import ecc_constraint_penalty
+from elome.anvil import ecc_constraint_penalty
 
 ecc_target = make_transit_target(t_obs, y_obs, yerr_obs,
                                  t0_guess=T0_TRUE, period_guess=PER_TRUE,

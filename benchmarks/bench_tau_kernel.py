@@ -24,8 +24,8 @@ import time
 import numpy as np
 import mlx.core as mx
 
-from metalplanet.metal import flux_dev_from_tau, flux_dev_metal
-from metalplanet.orbit import separation_circular
+from elome.metal import flux_dev_from_tau, flux_dev_metal
+from elome.orbit import separation_circular
 
 P, A, B, R, U1, U2 = 3.4525, 8.84, 0.30, 0.1153, 0.4225, 0.3077
 EXP = 29.4 / 60.0 / 24.0          # Kepler long cadence

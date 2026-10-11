@@ -3,8 +3,8 @@
 Mirrors the API and conventions of Kreidberg's ``batman`` package for
 drop-in familiarity:
 
-    import metalplanet
-    params = metalplanet.TransitParams()
+    import elome
+    params = elome.TransitParams()
     params.t0 = 0.0            # time of inferior conjunction
     params.per = 1.0           # orbital period
     params.rp = 0.1            # planet radius [stellar radii]
@@ -15,7 +15,7 @@ drop-in familiarity:
     params.u = [0.1, 0.3]      # limb-darkening coefficients
     params.limb_dark = "quadratic"
 
-    m = metalplanet.TransitModel(params, t)
+    m = elome.TransitModel(params, t)
     flux = m.light_curve(params)          # numpy array
 
 Differences from batman, by design:
@@ -26,16 +26,16 @@ Differences from batman, by design:
   whole computation is an MLX graph — differentiable and GPU-capable;
 * supported limb_dark: "uniform", "linear", "quadratic", "polynomial"
   for I(mu)/I0 = 1 - sum_n u_n (1-mu)^n at ANY order (ALFM19's M_n
-  recursion, metalplanet/poly.py), and the hybrid laws "hybrid2",
+  recursion, elome/poly.py), and the hybrid laws "hybrid2",
   "hybrid4", "hybrid5" (even powers of mu plus double poles, elementary
-  and more accurate than quadratic; metalplanet/hybrid.py), whose ``u``
+  and more accurate than quadratic; elome/hybrid.py), whose ``u``
   holds the shape-basis weights w; batman's non-polynomial laws
   ("nonlinear", "squareroot", ...) are not covered by this formulation;
 * no error-tolerance machinery (`max_err`, `fac`, `nthreads`): the model
   is closed-form, there is no integration error to budget.
 
 For float32 GPU *sampling* with thousands of chains, use
-``metalplanet.anvil`` instead — absolute times of order 2.45e6 days
+``elome.anvil`` instead — absolute times of order 2.45e6 days
 cannot survive float32, so this frontend computes in float64 on the CPU
 by default (`dtype=mx.float32` opts into the GPU at your own risk for
 well-conditioned times).
@@ -103,7 +103,7 @@ class TransitParams:
         self.limb_dark = None     # "uniform" | "linear" | "quadratic"
         self.fp = None            # planet/star flux ratio (secondary)
         self.t_secondary = None   # unused; secondary timing is computed
-        # an oblate planet (hybrid laws only; metalplanet.oblate): projected
+        # an oblate planet (hybrid laws only; elome.oblate): projected
         # flattening f = 1 - B/A, with rp then the area-equivalent radius
         # sqrt(A B), and theta the sky angle of the long axis from the
         # direction of motion at transit [degrees]. None = spherical.
@@ -880,7 +880,7 @@ class TransitModel:
         normalises once and threads it through."""
         if self._hlaw is not None:
             # a hybrid law is the same law if it computes the same thing:
-            # the name "hybrid2" and metalplanet.HYBRID2 are one law; a name
+            # the name "hybrid2" and elome.HYBRID2 are one law; a name
             # the registry has since re-bound to another definition is not
             new = _hybrid_law(params.limb_dark)
             changed = new is None or new.definition != self._hlaw.definition
@@ -994,7 +994,7 @@ class TransitModel:
         orbit degenerates exactly to the circular one at e = 0, so one
         code path serves both.
 
-        For fitting with thousands of chains prefer ``metalplanet.anvil``,
+        For fitting with thousands of chains prefer ``elome.anvil``,
         which owns the likelihood and the float32 conditioning as well.
         """
         cols, u_np = self._stack_params(params_seq)

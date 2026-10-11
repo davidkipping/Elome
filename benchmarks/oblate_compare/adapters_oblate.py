@@ -4,7 +4,7 @@ Each code computes the scenario's light curve (scenario_oblate.py) in its
 own parameterisation; the mappings were checked against each other before
 timing (README.md here):
 
-    metalplanet    TransitParams.f / .theta [deg], hybrid2 with w = (0.5, 0)
+    elome    TransitParams.f / .theta [deg], hybrid2 with w = (0.5, 0)
     squishyplanet  projected_effective_r / projected_f / projected_theta
     JoJo           oblate_lc: rp_me = r_eff, obliquity = -theta (its Y axis
                    points the other way), a/R* through the stellar density
@@ -29,12 +29,12 @@ RHO = (A_RS / 3.753) ** 3 / PER ** 2      # JoJo's a/R* = 3.753 (P^2 rho)^(1/3)
 
 
 # ---------------------------------------------------------------------------
-# MetalPlanet
+# Elómë
 # ---------------------------------------------------------------------------
 
 def _mp_params(**over):
-    import metalplanet
-    p = metalplanet.TransitParams()
+    import elome
+    p = elome.TransitParams()
     p.t0, p.per, p.rp, p.a, p.inc = T0, PER, RP, A_RS, math.degrees(INC)
     p.ecc, p.w = 0.0, 90.0
     p.limb_dark, p.u = "hybrid2", [W_LD, 0.0]
@@ -45,46 +45,46 @@ def _mp_params(**over):
 
 
 def _mp_prepare(n, dtype):
-    import metalplanet
+    import elome
     p = _mp_params()
-    m = metalplanet.TransitModel(p, time_grid(n), dtype=dtype)
+    m = elome.TransitModel(p, time_grid(n), dtype=dtype)
     m.light_curve(p)
     return m, p
 
 
-def metalplanet_fp64_prepare(n):
+def elome_fp64_prepare(n):
     import mlx.core as mx
     return _mp_prepare(n, mx.float64)
 
 
-def metalplanet_fp32_prepare(n):
+def elome_fp32_prepare(n):
     import mlx.core as mx
     return _mp_prepare(n, mx.float32)
 
 
-def metalplanet_fp64_run(state):
+def elome_fp64_run(state):
     m, p = state
     return m.light_curve(p)
 
 
-metalplanet_fp32_run = metalplanet_fp64_run
+elome_fp32_run = elome_fp64_run
 
 
-def metalplanet_fp32_batch_prepare():
+def elome_fp32_batch_prepare():
     import mlx.core as mx
-    import metalplanet
+    import elome
     bp = batch_params()
     p = _mp_params()
     p.rp, p.f, p.theta = bp["rp"], bp["f"], np.degrees(bp["theta"])
     p.t0, p.per, p.a = bp["t0"], bp["per"], bp["a"]
     p.inc = np.degrees(np.arccos(bp["b"] / bp["a"]))
-    m = metalplanet.TransitModel(_mp_params(), time_grid(BATCH_NPT),
+    m = elome.TransitModel(_mp_params(), time_grid(BATCH_NPT),
                                  dtype=mx.float32)
     m.light_curves(p)
     return m, p
 
 
-def metalplanet_fp32_batch_run(state):
+def elome_fp32_batch_run(state):
     m, p = state
     return m.light_curves(p)
 
@@ -93,10 +93,10 @@ def _mp_grad_prepare(n, dtype):
     """value + gradient of sum(ct * flux) in rp, f, theta, inc, t0, per, a
     and the limb-darkening weight, through light_curve_mx."""
     import mlx.core as mx
-    import metalplanet
+    import elome
     p = _mp_params()
     stream = mx.cpu if dtype == mx.float64 else mx.gpu
-    m = metalplanet.TransitModel(p, time_grid(n), dtype=dtype)
+    m = elome.TransitModel(p, time_grid(n), dtype=dtype)
     ct = mx.array(np.random.default_rng(0).normal(size=n), dtype=dtype)
     names = ("rp", "f", "theta", "inc", "t0", "per", "a")
     x0 = [mx.array(float(getattr(p, k)), dtype=dtype) for k in names] + \
@@ -110,11 +110,11 @@ def _mp_grad_prepare(n, dtype):
         return mx.sum(ct * m.light_curve_mx(q))
     vg = mx.value_and_grad(loss, argnums=tuple(range(len(x0))))
     state = (vg, x0, stream)
-    metalplanet_grad_run(state)
+    elome_grad_run(state)
     return state
 
 
-def metalplanet_grad_run(state):
+def elome_grad_run(state):
     import mlx.core as mx
     vg, x0, stream = state
     with mx.stream(stream):
@@ -123,18 +123,18 @@ def metalplanet_grad_run(state):
     return np.array([float(x) for x in g])
 
 
-def metalplanet_fp64_grad_prepare(n):
+def elome_fp64_grad_prepare(n):
     import mlx.core as mx
     return _mp_grad_prepare(n, mx.float64)
 
 
-def metalplanet_fp32_grad_prepare(n):
+def elome_fp32_grad_prepare(n):
     import mlx.core as mx
     return _mp_grad_prepare(n, mx.float32)
 
 
-metalplanet_fp64_grad_run = metalplanet_grad_run
-metalplanet_fp32_grad_run = metalplanet_grad_run
+elome_fp64_grad_run = elome_grad_run
+elome_fp32_grad_run = elome_grad_run
 
 
 # ---------------------------------------------------------------------------
@@ -325,8 +325,8 @@ def greenlantern_grad_run(state):
     return dflux.host @ ct
 
 
-CODES = ["metalplanet_fp64", "metalplanet_fp32", "squishyplanet", "jojo",
+CODES = ["elome_fp64", "elome_fp32", "squishyplanet", "jojo",
          "greenlantern"]
-BATCH_CODES = ["metalplanet_fp32", "squishyplanet", "jojo", "greenlantern"]
-GRAD_CODES = ["metalplanet_fp64", "metalplanet_fp32", "squishyplanet",
+BATCH_CODES = ["elome_fp32", "squishyplanet", "jojo", "greenlantern"]
+GRAD_CODES = ["elome_fp64", "elome_fp32", "squishyplanet",
               "greenlantern"]

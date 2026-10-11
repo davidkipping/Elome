@@ -1,4 +1,4 @@
-"""MetalPlanet quickstart — the batman tutorial, plus what batman can't
+"""Elómë quickstart — the batman tutorial, plus what batman can't
 do: gradients.
 
 Run:  ../anvil/.venv/bin/python examples/quickstart.py
@@ -7,10 +7,10 @@ Run:  ../anvil/.venv/bin/python examples/quickstart.py
 import mlx.core as mx
 import numpy as np
 
-import metalplanet
+import elome
 
 # -- 1. the batman workflow ------------------------------------------------
-params = metalplanet.TransitParams()
+params = elome.TransitParams()
 params.t0 = 0.0
 params.per = 1.0
 params.rp = 0.1
@@ -22,7 +22,7 @@ params.u = [0.1, 0.3]
 params.limb_dark = "quadratic"
 
 t = np.linspace(-0.05, 0.05, 1000)
-m = metalplanet.TransitModel(params, t)
+m = elome.TransitModel(params, t)
 flux = m.light_curve(params)
 print(f"transit depth ~ {1 - flux.min():.6f} "
       f"(rp^2 = {params.rp**2:.6f} + limb darkening)")
@@ -36,7 +36,7 @@ params.rp = 0.1
 # eccentric orbit + supersampling
 params.ecc = 0.3
 params.w = 45.0
-m_ecc = metalplanet.TransitModel(params, t, supersample_factor=7,
+m_ecc = elome.TransitModel(params, t, supersample_factor=7,
                                  exp_time=0.001)
 print(f"eccentric, supersampled: min flux "
       f"{m_ecc.light_curve(params).min():.6f}")
@@ -46,7 +46,7 @@ print(f"eccentric, supersampled: min flux "
 z = mx.array(np.abs(np.linspace(-1.3, 1.3, 9)), dtype=mx.float64)
 
 def total_dev(rp, u1, u2):
-    return mx.sum(metalplanet.flux_dev_analytic(z, rp, u1, u2))
+    return mx.sum(elome.flux_dev_analytic(z, rp, u1, u2))
 
 with mx.stream(mx.cpu):
     g = mx.grad(total_dev, argnums=(0, 1, 2))(
@@ -57,4 +57,4 @@ with mx.stream(mx.cpu):
           [f"{float(x):+.5f}" for x in g])
 
 print("\nFor GPU sampling with thousands of MCMC chains, see "
-      "metalplanet.anvil and examples/injection_recovery.py")
+      "elome.anvil and examples/injection_recovery.py")

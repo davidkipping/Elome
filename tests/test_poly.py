@@ -13,9 +13,9 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet
-from metalplanet.greens import greens_affine, greens_transform_np
-from metalplanet.poly import flux_dev_poly, sn_dev_poly
+import elome
+from elome.greens import greens_affine, greens_transform_np
+from elome.poly import flux_dev_poly, sn_dev_poly
 
 mp = pytest.importorskip("mpmath")
 mp.mp.dps = 40
@@ -89,7 +89,7 @@ class TestConsistency:
         with mx.stream(mx.cpu):
             z = mx.array(bs, dtype=mx.float64)
             a = np.array(flux_dev_poly(z, R, [0.4, 0.25]))
-            b = np.array(metalplanet.flux_dev(z, R, 0.4, 0.25))
+            b = np.array(elome.flux_dev(z, R, 0.4, 0.25))
         assert np.abs(a - b).max() < 1e-15
 
     def test_zero_outside_transit(self):
@@ -189,12 +189,12 @@ class TestFrontend:
     T = np.linspace(-0.12, 0.12, 301)
 
     def _model(self, u, law="polynomial", **kw):
-        p = metalplanet.TransitParams()
+        p = elome.TransitParams()
         p.t0, p.per, p.rp, p.a, p.inc = 0.0, 3.456, R, 8.8, 87.07
         p.ecc, p.w, p.u, p.limb_dark = 0.0, 90.0, u, law
         for k, v in kw.items():
             setattr(p, k, v)
-        return metalplanet.TransitModel(p, self.T), p
+        return elome.TransitModel(p, self.T), p
 
     def test_polynomial_n2_equals_quadratic(self):
         mq, pq = self._model([0.4, 0.25], law="quadratic")

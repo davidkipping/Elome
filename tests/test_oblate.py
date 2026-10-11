@@ -1,4 +1,4 @@
-"""Oblate planets, Stage 1: the reference MLX graph (metalplanet/oblate.py).
+"""Oblate planets, Stage 1: the reference MLX graph (elome/oblate.py).
 
 The truth is SquishierPlanet's analytic reference (numpy; importorskip) and
 its independent quadrature oracle; the contract is its brief's
@@ -17,9 +17,9 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet as mp
-from metalplanet import oblate as O
-from metalplanet.hybrid import HYBRID2, HybridLaw, LAWS, hybrid_norms, shape_cols
+import elome as el
+from elome import oblate as O
+from elome.hybrid import HYBRID2, HybridLaw, LAWS, hybrid_norms, shape_cols
 
 _SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
 if _SP.is_dir() and str(_SP) not in sys.path:
@@ -119,10 +119,10 @@ def test_axes_and_domain():
     assert abs(A * B - 0.01) < 1e-17 and abs(B / A - 0.7) < 1e-15
     assert O.max_r_eff(0.5) == pytest.approx(0.5 ** 1.5)
     with pytest.raises(ValueError, match="r_eff"):
-        mp.flux_dev_oblate(f64([0.5]), f64([0.0]), 0.6, 0.5, W["hybrid4"], "hybrid4")
+        el.flux_dev_oblate(f64([0.5]), f64([0.0]), 0.6, 0.5, W["hybrid4"], "hybrid4")
     for bad_f in (-0.1, 1.0):
         with pytest.raises(ValueError, match="flattening"):
-            mp.flux_dev_oblate(f64([0.5]), f64([0.0]), 0.1, bad_f, W["hybrid4"], "hybrid4")
+            el.flux_dev_oblate(f64([0.5]), f64([0.0]), 0.1, bad_f, W["hybrid4"], "hybrid4")
 
 
 @needs_sp
@@ -161,14 +161,14 @@ def test_law_light_curve_matches_squishierplanet(law):
     """flux_dev_oblate along tilted transit chords vs squishierplanet.flux,
     sky frame and theta convention included."""
     if law == "hybrid2" and float(spl.HYBRID2_EPS) != LAWS["hybrid2"].eps[0]:
-        pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not MetalPlanet's")
+        pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not Elómë's")
     L = spl.hybrid(law, W[law])
     for r, f, th, b in ((0.1, 0.1, 0.4, 0.3), (0.2, 0.3, 1.0, 0.6), (0.05, 0.5, 2.5, 0.0)):
         A, B = sp.axes_from_reff(r, f)
         X = np.linspace(-(1 + A) * 1.02, (1 + A) * 1.02, 301)
         Y = np.full_like(X, b)
         x0, y0 = O.principal_frame(X, Y, th)
-        got = cpu_np(lambda: mp.flux_dev_oblate(f64(x0), f64(y0), r, f, W[law], law))
+        got = cpu_np(lambda: el.flux_dev_oblate(f64(x0), f64(y0), r, f, W[law], law))
         ref = sp.flux(L, X, Y, A, B, th) - 1.0
         assert np.abs(got - ref).max() < 1e-12, (r, f, th, b)
 
@@ -251,7 +251,7 @@ def test_ld_basis_identity():
         Bc = cpu_np(lambda: O.shape_cols_oblate(f64(x0), f64(y0), 0.12, 0.25, law))
         w = rng.dirichlet(np.ones(LAWS[law].n_w + 1))[:-1]
         c = np.concatenate([[1.0], -w])
-        got = cpu_np(lambda: mp.flux_dev_oblate(f64(x0), f64(y0), 0.12, 0.25, list(w), law))
+        got = cpu_np(lambda: el.flux_dev_oblate(f64(x0), f64(y0), 0.12, 0.25, list(w), law))
         assert np.abs(got - (Bc @ c) / (hybrid_norms(law) @ c)).max() < 1e-15
 
 
@@ -275,7 +275,7 @@ def test_gradients_match_finite_differences(pt):
     law, w = "hybrid5", W["hybrid5"]
 
     def fn(x, y, r, f, ww):
-        return mx.sum(mp.flux_dev_oblate(x, y, r, f, ww, law))
+        return mx.sum(el.flux_dev_oblate(x, y, r, f, ww, law))
 
     with mx.stream(mx.cpu):
         g = mx.grad(fn, argnums=(0, 1, 2, 3, 4))(*map(f64, pt), f64(w))
@@ -315,7 +315,7 @@ def test_gradients_finite_on_a_boundary_sweep(dtype):
     with mx.stream(stream):
         for c in cfgs:
             def fn(x, y, r, f):
-                return mx.sum(mp.flux_dev_oblate(x, y, r, f, W["hybrid5"], "hybrid5"))
+                return mx.sum(el.flux_dev_oblate(x, y, r, f, W["hybrid5"], "hybrid5"))
             g = mx.grad(fn, argnums=(0, 1, 2, 3))(*(mx.array(v, dtype=dtype) for v in c))
             mx.eval(g)
             for gi in g:
@@ -330,9 +330,9 @@ def test_weight_forms_agree():
     X = np.linspace(-1.1, 1.1, 64)
     x0, y0 = O.principal_frame(X, 0.3, 0.5)
     w = W["hybrid4"]
-    host = cpu_np(lambda: mp.flux_dev_oblate(f64(x0), f64(y0), 0.1, 0.2, w, "hybrid4"))
-    traced = cpu_np(lambda: mp.flux_dev_oblate(f64(x0), f64(y0), 0.1, 0.2, f64(w), "hybrid4"))
-    rows = cpu_np(lambda: mp.flux_dev_oblate(f64(np.stack([x0, x0])), f64(np.stack([y0, y0])),
+    host = cpu_np(lambda: el.flux_dev_oblate(f64(x0), f64(y0), 0.1, 0.2, w, "hybrid4"))
+    traced = cpu_np(lambda: el.flux_dev_oblate(f64(x0), f64(y0), 0.1, 0.2, f64(w), "hybrid4"))
+    rows = cpu_np(lambda: el.flux_dev_oblate(f64(np.stack([x0, x0])), f64(np.stack([y0, y0])),
                                              0.1, 0.2, f64([w, w]), "hybrid4"))
     assert np.abs(host - traced).max() < 1e-16
     assert np.abs(rows - host[None]).max() < 1e-16
@@ -343,12 +343,12 @@ def test_data_contract_and_keyword_calls():
     float32 stays float32; the data may be passed by name."""
     X = np.linspace(-1.1, 1.1, 32)
     x0, y0 = O.principal_frame(X, 0.3, 0.5)
-    a = mp.flux_dev_oblate(x0, y0, 0.1, 0.2, W["hybrid2"], "hybrid2")
+    a = el.flux_dev_oblate(x0, y0, 0.1, 0.2, W["hybrid2"], "hybrid2")
     assert a.dtype == mx.float64
-    b = mp.flux_dev_oblate(x0=x0, y0=y0, r=0.1, f=0.2, w=W["hybrid2"], law="hybrid2")
+    b = el.flux_dev_oblate(x0=x0, y0=y0, r=0.1, f=0.2, w=W["hybrid2"], law="hybrid2")
     with mx.stream(mx.cpu):
         assert np.array_equal(np.asarray(a), np.asarray(b))
-    c = mp.flux_dev_oblate(x0.astype(np.float32), y0.astype(np.float32), 0.1, 0.2,
+    c = el.flux_dev_oblate(x0.astype(np.float32), y0.astype(np.float32), 0.1, 0.2,
                            W["hybrid2"], "hybrid2")
     assert c.dtype == mx.float32
 
@@ -366,8 +366,8 @@ def test_fp64_graph_compiles():
     x0, y0 = O.principal_frame(X, 0.3, 0.5)
     with mx.stream(mx.cpu):
         xa, ya = f64(x0), f64(y0)
-        eager = mp.flux_dev_oblate(xa, ya, 0.1, 0.2, W["hybrid5"], "hybrid5")
-        comp = mx.compile(lambda x, y: mp.flux_dev_oblate(x, y, 0.1, 0.2, W["hybrid5"], "hybrid5"))
+        eager = el.flux_dev_oblate(xa, ya, 0.1, 0.2, W["hybrid5"], "hybrid5")
+        comp = mx.compile(lambda x, y: el.flux_dev_oblate(x, y, 0.1, 0.2, W["hybrid5"], "hybrid5"))
         got = comp(xa, ya)
         assert np.abs(np.asarray(got) - np.asarray(eager)).max() < 1e-15
 
@@ -381,7 +381,7 @@ def test_theta_gradient_through_the_sky_frame(dtype):
 
     def fn(th, b):
         x0, y0 = O.principal_frame(mx.array(X, dtype=dtype), b, th)
-        return mx.sum(mp.flux_dev_oblate(x0, y0, 0.1, 0.25, W["hybrid4"], "hybrid4"))
+        return mx.sum(el.flux_dev_oblate(x0, y0, 0.1, 0.25, W["hybrid4"], "hybrid4"))
 
     with mx.stream(stream):
         for th in (0.0, 0.4, math.pi / 2):

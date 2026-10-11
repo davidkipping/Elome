@@ -315,7 +315,7 @@
   "reps": 9
  },
  {
-  "code": "metalplanet_gpu",
+  "code": "elome_gpu",
   "mode": "batch",
   "n": 0,
   "threads": 0,
@@ -675,7 +675,7 @@
   "reps": 5
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "ecc",
   "n": 1000,
   "threads": 0,
@@ -684,7 +684,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "ecc",
   "n": 10000,
   "threads": 0,
@@ -693,7 +693,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "ecc",
   "n": 100000,
   "threads": 0,
@@ -702,7 +702,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "ecc",
   "n": 1000000,
   "threads": 0,
@@ -711,7 +711,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "ecc",
   "n": 10000000,
   "threads": 0,
@@ -720,7 +720,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "ecc",
   "n": 1000,
   "threads": 0,
@@ -729,7 +729,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "ecc",
   "n": 10000,
   "threads": 0,
@@ -738,7 +738,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "ecc",
   "n": 100000,
   "threads": 0,
@@ -747,7 +747,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "ecc",
   "n": 1000000,
   "threads": 0,
@@ -756,7 +756,7 @@
   "reps": 9
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "ecc",
   "n": 10000000,
   "threads": 0,
@@ -765,7 +765,7 @@
   "reps": 3
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "single",
   "n": 1000,
   "threads": 0,
@@ -774,7 +774,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "single",
   "n": 10000,
   "threads": 0,
@@ -783,7 +783,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "single",
   "n": 100000,
   "threads": 0,
@@ -792,7 +792,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "single",
   "n": 1000000,
   "threads": 0,
@@ -801,7 +801,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp32",
+  "code": "elome_fp32",
   "mode": "single",
   "n": 10000000,
   "threads": 0,
@@ -810,7 +810,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "single",
   "n": 1000,
   "threads": 0,
@@ -819,7 +819,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "single",
   "n": 10000,
   "threads": 0,
@@ -828,7 +828,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "single",
   "n": 100000,
   "threads": 0,
@@ -837,7 +837,7 @@
   "reps": 15
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "single",
   "n": 1000000,
   "threads": 0,
@@ -846,7 +846,7 @@
   "reps": 12
  },
  {
-  "code": "metalplanet_fp64",
+  "code": "elome_fp64",
   "mode": "single",
   "n": 10000000,
   "threads": 0,

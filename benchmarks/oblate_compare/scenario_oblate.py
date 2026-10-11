@@ -2,7 +2,7 @@
 (benchmarks/scenario.py) with a flattened, tilted planet.
 
 Limb darkening is the one profile every code here can express exactly:
-I(mu) = 1 - w (1 - mu^2), w = 0.5. That is MetalPlanet's hybrid2 law with
+I(mu) = 1 - w (1 - mu^2), w = 0.5. That is Elómë's hybrid2 law with
 its pole weight 0 (the oblate path takes hybrid laws only), and the
 quadratic law with (u1, u2) = (2w, -w) = (1.0, -0.5) for squishyplanet,
 JoJo and GreenLantern (JoJo is quadratic-only). Circular orbit,

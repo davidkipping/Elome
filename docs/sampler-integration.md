@@ -1,4 +1,4 @@
-# Driving MetalPlanet from a sampler: the batching rule
+# Driving Elómë from a sampler: the batching rule
 
 Every measured number in this guide is reproducible by
 `benchmarks/verify_doc_claims.py` (results cached in
@@ -39,7 +39,7 @@ land anywhere from ~580x to ~1000x, because the looped side is dominated
 by per-dispatch overhead that thermal and buffer-cache conditions shift.
 Treat the *order* as the claim, not the digits.
 
-A per-walker loop turns MetalPlanet into the slowest code in the
+A per-walker loop turns Elómë into the slowest code in the
 benchmark; a batched call makes it the fastest. If a dispatch carries
 fewer than ~3×10^4 points, a CPU code genuinely is faster — batch
 harder or use a CPU path.
@@ -49,7 +49,7 @@ harder or use a CPU path.
 ### Fitting real mission data
 
 ```python
-from metalplanet.anvil import make_transit_target, import_engine
+from elome.anvil import make_transit_target, import_engine
 engine, _ = import_engine()
 
 tt = make_transit_target(t, y, yerr,          # BTJD/BKJD/BJD, flux ~1
@@ -65,7 +65,7 @@ epoch centering (raw BJD has a 0.25 d float32 ulp and cannot survive
 otherwise), the flux offset, the ParamSpec boxes, `report_offset` so
 reported values come back on the input time system, and — with
 `eccentric=True` — the joint-constraint barrier. **Omitting that barrier
-is the easiest way to get a wrong eccentric fit**: MetalPlanet clamps
+is the easiest way to get a wrong eccentric fit**: Elómë clamps
 every numerical hazard, so an unphysical geometry returns an ordinary
 finite log-likelihood and the chain samples an improper posterior in
 silence. `tt.model_params(t0=..., period=..., r=..., ...)` converts
@@ -77,7 +77,7 @@ anvil-gp GP over the same mean function, say — to wrap.
 
 ### anvil (native — nothing to do)
 
-`metalplanet.anvil.make_quad_transit_flux(period_ref)` returns the
+`elome.anvil.make_quad_transit_flux(period_ref)` returns the
 engine-contract `model_fn(v, x)`: v = (n_chains, 8) parameters,
 x = (2, m) epoch-centered times. The engine evaluates every chain per
 likelihood call. Note the engine's `ChunkedGaussianLogLike` slices the
@@ -100,7 +100,7 @@ relative to the retired dedicated kernel is in CHANGELOG 0.6.0.
 **The eccentric model needs a prior term that the engine cannot give
 you.** Periastron clearance (a(1-e) > 1+r) and a real inclination
 (|cos i| <= 1) couple parameters, so no box of ParamSpecs expresses
-them, and MetalPlanet clamps every numerical hazard — an unphysical
+them, and Elómë clamps every numerical hazard — an unphysical
 geometry returns an ordinary *finite* log-likelihood. Add
 `ecc_constraint_penalty` (a smooth quadratic barrier; `-inf` walls make
 HMC diverge) or wrap your likelihood in `PenalizedLogLike`, as
@@ -115,7 +115,7 @@ same `(nwalkers, ndim, log_prob_fn)` + `run_mcmc` + `get_chain` surface,
 but the StretchMove runs entirely on-GPU — no per-move numpy upload,
 no device-to-host sync inside the loop. Its `log_prob_fn` must be
 batched MLX ((nwalkers, ndim) → (nwalkers,)); pair it with
-`ChunkedGaussianLogLike` exactly as `metalplanet.anvil.make_target`
+`ChunkedGaussianLogLike` exactly as `elome.anvil.make_target`
 does.
 
 ### CPU emcee (when you need emcee itself)
@@ -132,8 +132,8 @@ A correct, fast recipe (priors included — see the warning after it):
 ```python
 import numpy as np, mlx.core as mx, emcee
 from anvil.precision import ChunkedGaussianLogLike
-from metalplanet.anvil import make_quad_transit_flux
-from metalplanet.orbit import epoch_center_times
+from elome.anvil import make_quad_transit_flux
+from elome.orbit import epoch_center_times
 
 model = make_quad_transit_flux(period_ref)        # fused Metal kernel inside
 x64 = epoch_center_times(t, t0_ref, period_ref)   # float64 host preprocessing
@@ -156,7 +156,7 @@ sampler = emcee.EnsembleSampler(n_walkers, 8, log_prob_batch, vectorize=True)
 Three things this recipe gets right that a minimal one silently gets
 wrong:
 
-1. **Priors are mandatory.** MetalPlanet clamps every numerical hazard,
+1. **Priors are mandatory.** Elómë clamps every numerical hazard,
    so unphysical proposals (negative r, q1 outside [0,1], |b| > a)
    return ordinary *finite* log-likelihoods — without the bounds term
    the chain wanders into flat unbounded directions and mirror modes
@@ -237,7 +237,7 @@ chains like anywhere else.
 
 There is no gradient overhead to switch off. MLX autodiff is
 transformation-based: the backward computation exists only when a
-sampler applies `mx.grad`/`mx.vjp`, and MetalPlanet's VJPs recompute
+sampler applies `mx.grad`/`mx.vjp`, and Elómë's VJPs recompute
 forward-style rather than storing a tape, so plain forward calls carry
 nothing extra. Forward-only samplers (Metropolis, stretch, emcee) get
 the pure forward kernel — 17.5 ms at 1024×65k (`examples/bench_vjp.py`).
@@ -313,8 +313,8 @@ A worked, step-by-step comparison with a spherical planet is
   e ≤ 0.999.
 - **Eccentricity near zero**: sample `(sqrt(e) cos w, sqrt(e) sin w)`,
   not `(e, w)` — and note that e = 0 is then an *interior* point the
-  sampler genuinely visits. MetalPlanet's eccentric path is
-  transit-anchored (`metalplanet/anchored.py`) precisely so that fp32
+  sampler genuinely visits. Elómë's eccentric path is
+  transit-anchored (`elome/anchored.py`) precisely so that fp32
   gradients survive there: measured relative gradient error is ~1e-7
   flat from e = 0.1 down to e = 1e-8, where the textbook formulation is
   already 100% wrong (`benchmarks/v3_kh_grad_conditioning.py`).
@@ -328,7 +328,7 @@ A worked, step-by-step comparison with a spherical planet is
 ## Why GPU-sampler + GPU-model is the strategic pairing
 
 Of the four possible CPU/GPU splits between sampler and model, running
-both on the GPU (anvil + MetalPlanet) is the only one with no
+both on the GPU (anvil + Elómë) is the only one with no
 per-iteration device crossing, no Python in the hot loop, and access to
 the 52.5 ms analytic gradients — while the CPU concurrently owns the
 float64 work (preprocessing, re-anchoring, diagnostics) that Metal

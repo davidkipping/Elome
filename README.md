@@ -1,4 +1,9 @@
-# MetalPlanet
+# Elómë
+
+*Elómë* (Quenya: *Él* "star" + *lómë* "dimness") -- a star dimmed by a
+passing planet. Formerly **MetalPlanet**: the package is `elome`
+(`pip install -e .`, `import elome`), and `import metalplanet` still works
+for now, with a deprecation warning.
 
 Analytic, differentiable exoplanet transit light curves on Apple Silicon,
 built on [MLX](https://github.com/ml-explore/mlx) — the
@@ -6,13 +11,13 @@ built on [MLX](https://github.com/ml-explore/mlx) — the
 formulation with a [batman](https://github.com/lkreidberg/batman)-style
 frontend.
 
-If you know batman, you know MetalPlanet:
+If you know batman, you know Elómë:
 
 ```python
 import numpy as np
-import metalplanet
+import elome
 
-params = metalplanet.TransitParams()
+params = elome.TransitParams()
 params.t0 = 0.0                    # time of inferior conjunction
 params.per = 1.0                   # orbital period
 params.rp = 0.1                    # planet radius [stellar radii]
@@ -24,7 +29,7 @@ params.u = [0.1, 0.3]              # limb-darkening coefficients
 params.limb_dark = "quadratic"     # or "linear", "uniform"
 
 t = np.linspace(-0.05, 0.05, 1000)
-m = metalplanet.TransitModel(params, t)
+m = elome.TransitModel(params, t)
 flux = m.light_curve(params)       # numpy array, batman-style
 ```
 
@@ -41,7 +46,7 @@ Not (yet) supported: nonlinear/power-2/exponential limb darkening,
 `max_err`/`fac` error-tolerance machinery (nothing to tune — the model
 is closed-form).
 
-**Scope**: MetalPlanet is strictly a *forward model* — (parameters,
+**Scope**: Elómë is strictly a *forward model* — (parameters,
 times) → flux, plus that map's analytic derivatives. It contains no
 sampler, likelihood, or fitting machinery and depends only on mlx and
 numpy; samplers (anvil, emcee, …) sit on the other side of a one-way
@@ -58,7 +63,7 @@ dependency arrow. See [CHANGELOG.md](CHANGELOG.md) for version history
 2. **GPU-batched.** Thousands of parameter vectors × 10⁵ data points in
    float32 on Apple-Silicon GPUs, with a float64 CPU verification path
    from the same code.
-3. **Sampler-ready.** `metalplanet.anvil` provides the batched,
+3. **Sampler-ready.** `elome.anvil` provides the batched,
    float32-conditioned model contract for the
    anvil (formerly applemcmc) MCMC engine (not yet public; see
    [Install](#install--test)): epoch-centered
@@ -95,12 +100,12 @@ python -m pytest tests -m "not slow"   # fast suite (~5 s)
 python examples/injection_recovery.py  # full GPU injection-recovery
 ```
 
-> **Note on anvil.** The MCMC engine that `metalplanet.anvil`, the
+> **Note on anvil.** The MCMC engine that `elome.anvil`, the
 > sampler guide (`docs/sampler-integration.md`) and several examples and
 > benchmarks refer to is a separate package that is **not yet public**.
-> It is an optional dependency: everything else in MetalPlanet — the
+> It is an optional dependency: everything else in Elómë — the
 > batman-style `TransitModel`, the Metal kernels, `flux_dev_from_tau`,
-> and the gradients — imports and runs without it. `metalplanet.anvil`
+> and the gradients — imports and runs without it. `elome.anvil`
 > imports it lazily: its model builders (`make_quad_transit_flux`,
 > `make_ecc_transit_flux`) work without it, and only the sampler targets
 > (`make_target`, `make_ecc_target`, `make_transit_target`) need it, failing
@@ -118,7 +123,7 @@ batman parity. `TransitModel.light_curves(sets)` is the batched form —
 same times, many parameter sets, one dispatch:
 
 ```python
-m = metalplanet.TransitModel(params, t, dtype=mx.float32)
+m = elome.TransitModel(params, t, dtype=mx.float32)
 flux = m.light_curves([p1, p2, p3])        # -> (3, len(t))
 # or one TransitParams whose attributes are arrays:
 p.rp = np.array([0.09, 0.10, 0.11])
@@ -130,7 +135,7 @@ points, float32 GPU; 112x when first measured under load) — a GPU dispatch cos
 size, so looping pays that floor 2,000 times. Mixed circular and
 eccentric sets are fine in one batch, and every exposure and
 limb-darkening mode works. For fitting with thousands of chains prefer
-`metalplanet.anvil`, which owns the likelihood and the float32
+`elome.anvil`, which owns the likelihood and the float32
 conditioning too.
 
 ## Gradients through the batman-style API: `light_curve_mx`
@@ -141,7 +146,7 @@ field you want a gradient for (t0, per, rp, a, inc, ecc, w, fp, the
 entries of `u`); Python numbers stay constants:
 
 ```python
-m = metalplanet.TransitModel(params, t)            # fp64, on the CPU
+m = elome.TransitModel(params, t)            # fp64, on the CPU
 with mx.stream(mx.cpu):
     def chi2(rp, ecc):
         params.rp, params.ecc = rp, ecc
@@ -247,7 +252,7 @@ joint-constraint barrier it requires.
 
 `limb_dark="polynomial"` takes `u = [u_1 ... u_N]` at **any** order for
 I(mu)/I0 = 1 - sum u_n (1-mu)^n, via ALFM19's M_n recursion
-(`metalplanet/poly.py`), validated against 40-digit mpmath direct
+(`elome/poly.py`), validated against 40-digit mpmath direct
 integration: 1e-15 at N = 8, 2e-13 at N = 16. The coefficients stay
 traced, so they can change between calls on a built model and the limb
 darkening itself is differentiable. (batman's *non*-polynomial laws —
@@ -283,7 +288,7 @@ written in a shape basis: each coefficient w_j is the share of the
 centre-to-limb drop its term carries, so `I(0)/I(1) = 1 - sum(w)`:
 
 ```python
-from metalplanet import TransitParams, TransitModel, simplex_from_q_np
+from elome import TransitParams, TransitModel, simplex_from_q_np
 
 p = TransitParams()
 p.t0, p.per, p.rp, p.a, p.inc, p.ecc, p.w = 0.0, 3.45, 0.1, 8.8, 87.0, 0.0, 90.0
@@ -320,7 +325,7 @@ integrals**, unlike the quadratic law's mu term: the even powers come from
 the ALFM19 even recursion and a pole term is kap1/(p eps) plus an atan or
 log of rational functions of (z, r). Checked against a 30-digit direct
 integration to 1e-13 and against SquishierPlanet's ellipse code at a = b
-to 1e-12 (`metalplanet/hybrid.py`). The laws ride the same paths as the
+to 1e-12 (`elome/hybrid.py`). The laws ride the same paths as the
 polynomial law: `light_curve`, `light_curves` (per-set weights), the
 contact rule, eccentric orbits, and `light_curve_mx` differentiable in
 every weight. On an fp32 GPU `TransitModel` the orbit runs on the MLX
@@ -341,7 +346,7 @@ dev = flux_dev_from_tau(tau, period, a, b, r, limb_dark="hybrid5",
 B = flux_dev_from_tau(tau, period, a, b, r, limb_dark="hybrid5",
                       ld_basis=True, exp_time=29.4 / 60 / 24)
 # B: (n, m, 6) shape-basis columns [E0, T_1..T_5];
-# dev == (B @ c) / (N @ c), c = (1, -w), N = metalplanet.hybrid_norms("hybrid5")
+# dev == (B @ c) / (N @ c), c = (1, -w), N = elome.hybrid_norms("hybrid5")
 ```
 
 | 512 x 5,000, contact, n_gl=5 | forward | vs quadratic | value+grad | vs quadratic |
@@ -368,7 +373,7 @@ z <= rp - 1, where the white dwarf is fully covered, F = 0 exactly and
 every gradient is zero.
 
 ```python
-import math, numpy as np, metalplanet as mp
+import math, numpy as np, elome as mp
 p = mp.TransitParams()
 p.t0, p.per, p.rp, p.a = 0.0, 1.4079, 7.28, 336.0        # WD 1856+534 b-like
 p.inc = math.degrees(math.acos(7.79 / p.a))              # b = 7.79: grazing
@@ -405,7 +410,7 @@ rp = 1 exactly is a degenerate point, where the contacts meet at z = 0:
 ## Oblate planets: `f`, `theta`
 
 A planet flattened by rotation, or a ringless planet seen with its pole
-tilted, projects to an ellipse. MetalPlanet models it with the hybrid
+tilted, projects to an ellipse. Elómë models it with the hybrid
 laws, from SquishierPlanet's formulation: semi-axes A = rp / sqrt(1 - f)
 and B = A (1 - f), so `rp` stays the **area-equivalent radius**
 sqrt(A B), `f` is the projected flattening 1 - B/A, and `theta` is the sky
@@ -414,7 +419,7 @@ angle of the long axis from the direction of motion at transit (degrees in
 spherical planet: those code paths are untouched, bit for bit.
 
 ```python
-from metalplanet import TransitParams, TransitModel, flux_dev_from_tau
+from elome import TransitParams, TransitModel, flux_dev_from_tau
 
 p = TransitParams()
 p.t0, p.per, p.rp, p.a, p.inc, p.ecc, p.w = 0.0, 3.45, 0.1, 8.8, 87.0, 0.0, 90.0
@@ -477,23 +482,23 @@ dimension, collapsing the limb-darkening weights with `ld_basis=True`
 
 **Against the other oblate codes** (`benchmarks/oblate_compare/`, the
 spherical benchmark's transit with f = 0.2 at 30 deg, a limb-darkening
-profile all four codes express exactly): in fp64 MetalPlanet, squishyplanet
+profile all four codes express exactly): in fp64 Elómë, squishyplanet
 and JoJo all reach rounding against a 30-digit integral (2e-16, 9e-16,
-2e-15), GreenLantern (fp32) 4.5e-6 and MetalPlanet fp32 7e-8. Wall time for
+2e-15), GreenLantern (fp32) 4.5e-6 and Elómë fp32 7e-8. Wall time for
 one light curve:
 
-| N | MetalPlanet fp32 (GPU) | GreenLantern (GPU) | JoJo | squishyplanet | MetalPlanet fp64 (CPU) |
+| N | Elómë fp32 (GPU) | GreenLantern (GPU) | JoJo | squishyplanet | Elómë fp64 (CPU) |
 |---:|---:|---:|---:|---:|---:|
 | 10^3 | 1.6 ms | 0.9 ms | 0.7 ms | 4.0 ms | 14 ms |
 | 10^5 | 1.8 ms | 24 ms | 47 ms | 410 ms | 443 ms |
 | 10^7 | 55 ms | 2.3 s | 7.0 s | 44 s | 48 s |
 
-512 parameter sets x 10,000 points: 0.03 s (MetalPlanet fp32), 1.2 s
+512 parameter sets x 10,000 points: 0.03 s (Elómë fp32), 1.2 s
 (GreenLantern), 2.7 s (JoJo), 31 s (squishyplanet). Value + gradient at
 10^5 points: 4.3 ms, 54 ms (GreenLantern), 2.5 s (squishyplanet); JoJo has
 no gradients. Below ~10^4 points the GPU dispatch floor lets the CPU
-codes win, and MetalPlanet's fp64 graph -- the exact reference -- is no
-faster than squishyplanet. The other codes cover what MetalPlanet does
+codes win, and Elómë's fp64 graph -- the exact reference -- is no
+faster than squishyplanet. The other codes cover what Elómë does
 not: the standard quadratic law (all three), polynomial laws of any order
 and phase curves (squishyplanet), triaxial planets (squishyplanet,
 GreenLantern). Full tables and the macOS build notes:
@@ -508,7 +513,7 @@ returns zero for them. A sampler fitting **per-transit mid-times** — TTVs,
 its model that way. `flux_dev_from_tau` is the entry point for that case:
 
 ```python
-from metalplanet import flux_dev_from_tau
+from elome import flux_dev_from_tau
 
 # tau: (n_chains, m) time since each point's OWN mid-transit, built
 # however the parameterisation requires -- MLX chains the rest

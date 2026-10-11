@@ -16,7 +16,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 out = {}
 
 # ---- claim 1: looped vs batched (the batching rule) ----------------------
-from metalplanet.metal import flux_dev_metal  # noqa: E402
+from elome.metal import flux_dev_metal  # noqa: E402
 
 rng = np.random.default_rng(0)
 npv, npt = 10_000, 1_000
@@ -56,7 +56,7 @@ print("batch_vs_loop:", out["batch_vs_loop"], flush=True)
 # ---- claim 2: fp32 raw-time phase-wrap error vs orbit count --------------
 # frontend-style raw absolute times through the fp32 circular path,
 # compared to the fp64 path, in-transit flux error via |dF/dz| ~ 0.05
-from metalplanet import TransitModel, TransitParams  # noqa: E402
+from elome import TransitModel, TransitParams  # noqa: E402
 
 per = 10.0
 wrap = {}

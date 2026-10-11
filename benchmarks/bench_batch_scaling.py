@@ -1,11 +1,11 @@
-"""Batch-size scaling: MetalPlanet GPU vs PyTransit (its strongest CPU
+"""Batch-size scaling: Elómë GPU vs PyTransit (its strongest CPU
 rival) at npv x 100k points — the GPU's core-utilization axis."""
 import json, os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 rows = []
 for npv in (64, 256, 512, 1024, 2048, 4096):
-    for code in ("metalplanet_gpu", "pytransit"):
+    for code in ("elome_gpu", "pytransit"):
         env = dict(os.environ, BENCH_NPV=str(npv), BENCH_NTHREADS="1",
                    NUMBA_NUM_THREADS="12", OMP_NUM_THREADS="12")
         r = subprocess.run([sys.executable, os.path.join(HERE, "worker.py"),

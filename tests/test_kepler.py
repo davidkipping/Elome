@@ -6,7 +6,7 @@ import math
 import mlx.core as mx
 import numpy as np
 
-from metalplanet.kepler import (
+from elome.kepler import (
     kepler_E,
     mean_anomaly_offset_at_transit,
     separation_keplerian,
@@ -129,7 +129,7 @@ class TestMarkleyKepler:
         return fac * np.sin(E) / (A + B), (B - A) / (A + B)
 
     def test_fp64_accuracy(self):
-        from metalplanet.kepler import kepler
+        from elome.kepler import kepler
         e = np.concatenate([RNG.uniform(0, 0.95, 3000),
                             [0.0, 0.5, 0.9, 0.95]])
         M = np.concatenate([RNG.uniform(-4 * np.pi, 4 * np.pi, 3000),
@@ -146,7 +146,7 @@ class TestMarkleyKepler:
         np.testing.assert_allclose(sf * sf + cf * cf, 1.0, atol=5e-14)
 
     def test_fp32_accuracy(self):
-        from metalplanet.kepler import kepler
+        from elome.kepler import kepler
         e = RNG.uniform(0, 0.9, 2000).astype(np.float32)
         M = RNG.uniform(-np.pi, np.pi, 2000).astype(np.float32)
         sf, cf = kepler(mx.array(M), mx.array(e))
@@ -159,7 +159,7 @@ class TestMarkleyKepler:
                                    rtol=0, atol=5e-6)
 
     def test_implicit_vjp_vs_finite_differences(self):
-        from metalplanet.kepler import kepler
+        from elome.kepler import kepler
         M0 = RNG.uniform(-3, 3, 200)
         e0 = RNG.uniform(0.01, 0.9, 200)
 
@@ -184,7 +184,7 @@ class TestMarkleyKepler:
                                        atol=1e-7)
 
     def test_odd_in_M_and_circular_limit(self):
-        from metalplanet.kepler import kepler
+        from elome.kepler import kepler
         M = RNG.uniform(0.01, np.pi - 0.01, 500)
         with mx.stream(mx.cpu):
             sp, cp = kepler(mx.array(M, dtype=mx.float64), 0.3)
@@ -249,7 +249,7 @@ class TestCartesianTail:
         assert np.abs(z32 - z64)[near].max() < 2e-4
 
     def test_E_level_implicit_vjp(self):
-        from metalplanet.kepler import kepler_E_sincos
+        from elome.kepler import kepler_E_sincos
         rng = np.random.default_rng(73)
         M0 = rng.uniform(-3, 3, 200)
         e0 = rng.uniform(0.01, 0.9, 200)

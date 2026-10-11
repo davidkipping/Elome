@@ -4,7 +4,7 @@ planet, ported from SquishierPlanet's jaxlc.moments (no gradients).
 Per point: (x0, y0, a, b) in the ellipse principal frame -> blocked fluxes
 [B_0..B_nmax (even basis), P_1..P_K (poles)], comparable with
 jaxlc.moments. With SPHERICAL_BRANCH, chains flagged spherical instead run
-MetalPlanet's spherical column function (to measure the cost of housing
+Elómë's spherical column function (to measure the cost of housing
 both paths in one kernel).
 
 Throwaway code: it exists to measure cost and fp32 behaviour.
@@ -17,8 +17,8 @@ SP = "/Users/dkipping/Storage1/Work/Documents/Transit_Work/CODES/SquishierPlanet
 sys.path.insert(0, SP)
 from squishierplanet.basis import alpha            # noqa: E402  (pure numpy)
 
-from metalplanet import metal as M
-from metalplanet import metal_hybrid as MH
+from elome import metal as M
+from elome import metal_hybrid as MH
 
 
 def _f(v):

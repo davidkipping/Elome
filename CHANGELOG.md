@@ -1,9 +1,25 @@
 # Changelog
 
-All notable changes to MetalPlanet. Versioning: semantic-ish
-(MAJOR.MINOR.PATCH); every release is tagged `vX.Y.Z` in git.
+All notable changes to Elómë (formerly MetalPlanet; entries before the
+rename keep the old name). Versioning: semantic-ish (MAJOR.MINOR.PATCH);
+every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
+
+## [0.14.0] — 2026-10-11
+
+### Changed
+- **Renamed: MetalPlanet is now Elómë** (Quenya: Él "star" + lómë
+  "dimness"). The package is `elome` -- `import elome`, distribution
+  `elome` -- and every module keeps its name (`elome.anvil`,
+  `elome.oblate`, ...). Results are unchanged (outputs and kernel sources
+  bitwise v0.13.2). Notebook 01 is now `01_elome_with_anvil.ipynb`.
+- `import metalplanet` keeps working as a deprecated alias: a shim
+  re-exporting `elome` (the same module objects, so caches and
+  monkeypatches are shared) with a DeprecationWarning, to be removed in a
+  future release. It also serves environments whose editable install
+  predates the rename: there it loads `elome` from the folder beside it.
+  Reinstall (`pip install -e .`) to register `elome` itself.
 
 ## [0.13.2] — 2026-10-11
 

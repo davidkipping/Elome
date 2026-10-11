@@ -57,7 +57,7 @@ def u_to_q_np(u1, u2):
 
 
 # ---------------------------------------------------------------------------
-# hybrid laws (metalplanet/hybrid.py): uniform priors on their physical
+# hybrid laws (elome/hybrid.py): uniform priors on their physical
 # regions, after SquishierPlanet's laws.py
 # ---------------------------------------------------------------------------
 

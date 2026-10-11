@@ -8,7 +8,7 @@ import math
 import mlx.core as mx
 import numpy as np
 
-from metalplanet import flux_dev, q_to_u
+from elome import flux_dev, q_to_u
 
 RNG = np.random.default_rng(31)
 

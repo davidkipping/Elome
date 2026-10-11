@@ -12,12 +12,12 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-from metalplanet.anchored import (anchor_constants, separation_anchored,
+from elome.anchored import (anchor_constants, separation_anchored,
                                   solve_sincos_delta, _one_minus_cos)
-from metalplanet.kepler import (separation_keplerian,
+from elome.kepler import (separation_keplerian,
                                 mean_anomaly_offset_at_transit)
-from metalplanet.flux import flux_dev
-from metalplanet.trig import sincos
+from elome.flux import flux_dev
+from elome.trig import sincos
 
 A, CI, R, U1, U2 = 8.8, 0.3 / 8.8, 0.1, 0.4225, 0.3077
 ECCS = [0.0, 1e-8, 1e-3, 0.05, 0.3, 0.7, 0.95, 0.99]

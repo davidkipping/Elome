@@ -3,7 +3,7 @@
 Production path: ``kepler(M, e) -> (sin f, cos f)`` — the Markley (1995)
 non-iterative scheme as used by jaxoplanet (cubic-equation starter
 accurate to ~1e-4, then ONE Nijenhuis/Markley fifth-order refinement),
-with two MetalPlanet-specific improvements:
+with two Elómë-specific improvements:
 
 * a single sincos evaluation total: sin/cos of the refined anomaly are
   reconstructed from sin/cos of the *starter* anomaly via a Taylor

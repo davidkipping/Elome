@@ -14,10 +14,10 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet as mp
-from metalplanet import oblate_tau as OT
-from metalplanet.hybrid import hybrid_norms
-from metalplanet.metal import _ecc_shape
+import elome as el
+from elome import oblate_tau as OT
+from elome.hybrid import hybrid_norms
+from elome.metal import _ecc_shape
 
 _SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
 if _SP.is_dir() and str(_SP) not in sys.path:
@@ -39,7 +39,7 @@ EXP = 1800.0 / 86400.0
 
 
 def flux(tau, b, r, law="hybrid5", **kw):
-    out = mp.flux_dev_from_tau(tau, P, A_RS, b, r, limb_dark=law,
+    out = el.flux_dev_from_tau(tau, P, A_RS, b, r, limb_dark=law,
                                u=kw.pop("u", W[law]), **kw)
     mx.eval(out)
     return np.asarray(out.astype(mx.float32) if out.dtype == mx.float32 else out,
@@ -73,7 +73,7 @@ def test_sky_frame_is_squishierplanets(e, w):
         if e == 0.0:
             X, Y, _, _, front = OT.sky_circular(f64(phi), A_RS, b)
         else:
-            from metalplanet.anchored import anchor_constants
+            from elome.anchored import anchor_constants
             X, Y, _, _, front = OT.sky_anchored(f64(phi), A_RS, ci,
                                                 anchor_constants(f64(k), f64(h)))
         X, Y, front = np.asarray(X), np.asarray(Y), np.asarray(front)
@@ -84,7 +84,7 @@ def test_sky_frame_is_squishierplanets(e, w):
 
 
 def test_sky_derivatives():
-    from metalplanet.anchored import anchor_constants
+    from elome.anchored import anchor_constants
     k, h = kh(0.4, 0.7)
     with mx.stream(mx.cpu):
         f64 = lambda v: mx.array(v, dtype=mx.float64)
@@ -115,8 +115,8 @@ def test_sky_derivatives():
     (0.08, 0.2, 0.3, 0.2, 0.6, -2.0),
 ])
 def test_light_curve_matches_squishierplanet(law, r, f, theta, b, e, w):
-    if law == "hybrid2" and float(spl.HYBRID2_EPS) != mp.HYBRID2_EPS:
-        pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not MetalPlanet's")
+    if law == "hybrid2" and float(spl.HYBRID2_EPS) != el.HYBRID2_EPS:
+        pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not Elómë's")
     kw = dict(f=f, theta=theta, integration="none")
     inc = math.acos(b / A_RS)
     if e > 0:
@@ -288,7 +288,7 @@ def test_out_of_transit_and_far_side_are_exactly_zero():
 def test_ld_basis_identity():
     for law in ("hybrid2", "hybrid4", "hybrid5"):
         kw = dict(f=0.25, theta=0.6, exp_time=EXP)
-        B = np.asarray(mp.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, limb_dark=law,
+        B = np.asarray(el.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, limb_dark=law,
                                             ld_basis=True, **kw))
         c = np.concatenate([[1.0], -np.asarray(W[law])])
         got = flux(TAU, 0.3, 0.1, law, **kw)
@@ -315,7 +315,7 @@ def _loss_fn(integration, extra):
     ct = np.random.default_rng(1).normal(size=TAU.shape)
 
     def loss(tau, period, a, b, r, f, theta, w, k, h):
-        out = mp.flux_dev_from_tau(tau, period, a, b, r, limb_dark="hybrid4",
+        out = el.flux_dev_from_tau(tau, period, a, b, r, limb_dark="hybrid4",
                                    u=w, f=f, theta=theta, secosw=k, sesinw=h,
                                    integration=integration, **extra)
         return mx.sum(mx.array(ct, dtype=mx.float64) * out)
@@ -377,7 +377,7 @@ def test_gradients_finite_on_a_sweep(dtype):
         for b, r, f, th in cases:
             for extra in ({}, {"exp_time": EXP}):
                 def loss(r_, f_, th_, b_):
-                    return mx.sum(mp.flux_dev_from_tau(
+                    return mx.sum(el.flux_dev_from_tau(
                         mx.array(tau, dtype=dtype), P, A_RS, b_, r_,
                         limb_dark="hybrid5", u=W["hybrid5"], f=f_, theta=th_, **extra))
                 g = mx.grad(loss, argnums=(0, 1, 2, 3))(
@@ -393,15 +393,15 @@ def test_gradients_finite_on_a_sweep(dtype):
 
 def test_keyword_errors():
     with pytest.raises(ValueError, match="hybrid law"):
-        mp.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, 0.4, 0.2, f=0.2)
+        el.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, 0.4, 0.2, f=0.2)
     with pytest.raises(ValueError, match="pass f= too"):
-        mp.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, limb_dark="hybrid4",
+        el.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, limb_dark="hybrid4",
                              u=W["hybrid4"], theta=0.3)
     with pytest.raises(ValueError, match="u1/u2"):
-        mp.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, 0.4, 0.2,
+        el.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, 0.4, 0.2,
                              limb_dark="hybrid4", f=0.2)
     with pytest.raises(ValueError, match="weights as u="):
-        mp.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, limb_dark="hybrid4", f=0.2)
+        el.flux_dev_from_tau(TAU, P, A_RS, 0.3, 0.1, limb_dark="hybrid4", f=0.2)
 
 
 def test_domain():
@@ -428,20 +428,20 @@ def test_contact_offsets_oblate_takes_any_input():
         *(mx.array([v], dtype=mx.float64) for v in (10.0, 0.3, 0.1, 0.2, 0.5)))]
     for args in [(10.0, 0.3, 0.1, 0.2, 0.5),
                  (np.array([10.0]), 0.3, np.array([0.1]), 0.2, 0.5)]:
-        got = mp.contact_offsets_oblate(*args)
+        got = el.contact_offsets_oblate(*args)
         assert got[0].dtype == mx.float64
         with mx.stream(mx.cpu):
             assert np.allclose([float(np.asarray(c).ravel()[0]) for c in got], ref,
                                rtol=0, atol=1e-15)
     with mx.stream(mx.gpu):
-        got = mp.contact_offsets_oblate(mx.array([10.0], dtype=mx.float64), 0.3, 0.1, 0.2, 0.5)
+        got = el.contact_offsets_oblate(mx.array([10.0], dtype=mx.float64), 0.3, 0.1, 0.2, 0.5)
     assert got[0].dtype == mx.float64
     k, h = 0.3, 0.2
     with mx.stream(mx.cpu):
         ci = float(_ecc_shape(*(mx.array(v, dtype=mx.float64) for v in (10.0, 0.3, k, h)))[2])
-    a = mp.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=k, h=h)
-    b = mp.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=k, h=h, ci=ci)
+    a = el.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=k, h=h)
+    b = el.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=k, h=h, ci=ci)
     with mx.stream(mx.cpu):
         assert np.allclose([float(x) for x in a], [float(x) for x in b], rtol=0, atol=1e-15)
     with pytest.raises(ValueError, match="both k and h"):
-        mp.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=0.3)
+        el.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=0.3)

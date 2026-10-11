@@ -10,7 +10,7 @@ import os
 
 import numpy as np
 
-import metalplanet
+import elome
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 T = np.linspace(-0.13, 0.13, 261)
@@ -18,10 +18,10 @@ EXP = 0.02          # ~29 min; T14 here is 0.126 d, so smearing is heavy
 
 
 def model(**kw):
-    p = metalplanet.TransitParams()
+    p = elome.TransitParams()
     p.t0, p.per, p.rp, p.a, p.inc = 0.0, 3.456, 0.1, 8.8, 87.07
     p.ecc, p.w, p.u, p.limb_dark = 0.0, 90.0, [0.4, 0.25], "quadratic"
-    return metalplanet.TransitModel(p, T, **kw), p
+    return elome.TransitModel(p, T, **kw), p
 
 
 def main():

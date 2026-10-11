@@ -1280,7 +1280,7 @@ def metal_available(reprobe: bool = False) -> bool:
             _metal_ok = False
             import warnings
             warnings.warn(
-                "MetalPlanet's Metal kernels are unavailable on this "
+                "Elómë's Metal kernels are unavailable on this "
                 f"machine ({type(err).__name__}: {err}); float32 calls use "
                 "the MLX graph instead (same results, ~10x slower). "
                 "metal_available(reprobe=True) probes again.",
@@ -1642,7 +1642,7 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
         exp_time: exposure duration in tau's units; 0 means instantaneous
             (and forces ``integration="none"``).
         integration: ``"contact"`` -- Gauss-Legendre on the exposure window
-            split at the four contact times, which MetalPlanet's own numbers
+            split at the four contact times, which Elómë's own numbers
             make strictly better per evaluation than supersampling (25 evals
             for 8.9e-8 against 101 for 1.7e-5 on a 29-minute exposure);
             ``"supersample"`` -- ``n_sub`` uniform nodes, batman's rule;
@@ -1656,12 +1656,12 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
         limb_dark, u: ``"quadratic"`` (the default, with ``u1``/``u2``), or
             a hybrid law ``"hybrid2" | "hybrid4" | "hybrid5"`` with ``u``
             its shape weights, ``(n_w,)`` shared or ``(n, n_w)`` per chain
-            (see ``metalplanet.hybrid``); same kernels' structure, no
+            (see ``elome.hybrid``); same kernels' structure, no
             elliptic integrals. With ``ld_basis=True`` a hybrid law returns
             its (n, m, 1 + n_w) shape-basis columns B = [E0, T_1..T_n],
             and ``flux - 1 == (B @ c)/(N @ c)`` with ``c = (1, -w)``,
             ``N = hybrid.hybrid_norms(law)``.
-        f, theta: an oblate planet (``metalplanet.oblate``): projected
+        f, theta: an oblate planet (``elome.oblate``): projected
             flattening f = 1 - B/A and the sky angle of its long axis from
             the direction of motion at transit, scalars or (n,). ``r`` is
             then the area-equivalent radius sqrt(A B), with

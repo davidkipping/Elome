@@ -5,7 +5,7 @@ import math
 import mlx.core as mx
 import numpy as np
 
-from metalplanet.solution import sn_dev
+from elome.solution import sn_dev
 from reference_limbdark import s0_ref, s1_ref, s2_ref
 
 RNG = np.random.default_rng(11)

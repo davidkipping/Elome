@@ -1,5 +1,5 @@
 """SquishierPlanet's JAX oblate path: cost (XLA cost analysis + timing) and
-light curves at small f, for comparison with MetalPlanet's spherical path."""
+light curves at small f, for comparison with Elómë's spherical path."""
 import sys, time, json, numpy as np
 sys.path.insert(0, "/Users/dkipping/Storage1/Work/Documents/Transit_Work/CODES/SquishierPlanet")
 import jax, jax.numpy as jnp

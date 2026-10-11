@@ -1,9 +1,9 @@
 """Baseline the compiled GRAPH eccentric path at 1024 x 65,536 — the
 denominator of the v3 plan's '>= 5x the graph path' gate."""
 import math, time, numpy as np, mlx.core as mx
-from metalplanet.kepler import separation_keplerian
-from metalplanet.flux import flux_dev
-from metalplanet.trig import sincos
+from elome.kepler import separation_keplerian
+from elome.flux import flux_dev
+from elome.trig import sincos
 
 N, M, REPS = 1024, 65536, 10
 rng = np.random.default_rng(0)

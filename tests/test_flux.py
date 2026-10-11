@@ -19,7 +19,7 @@ import mlx.core as mx
 import numpy as np
 from batman import _quadratic_ld
 
-from metalplanet import flux_dev, greens_transform_np, light_curve, quad_g_coeffs
+from elome import flux_dev, greens_transform_np, light_curve, quad_g_coeffs
 from reference_limbdark import flux_quad_ref
 
 RNG = np.random.default_rng(23)

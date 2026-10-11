@@ -30,7 +30,7 @@ WORKER = r"""
 import json, os, time
 import mlx.core as mx
 import numpy as np
-from metalplanet.anvil import make_quad_transit_flux
+from elome.anvil import make_quad_transit_flux
 
 mode = os.environ["BENCH_MODE"]
 meas = os.environ["BENCH_MEAS"]

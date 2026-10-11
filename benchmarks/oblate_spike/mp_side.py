@@ -1,9 +1,9 @@
-import sys, json, time, numpy as np, mlx.core as mx, metalplanet as mp
-from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+import sys, json, time, numpy as np, mlx.core as mx, elome as mp
+from elome.metal_hybrid import flux_dev_metal_hybrid
 d = json.load(open(sys.argv[1]))
 W = {"hybrid2": [0.3, 0.2], "hybrid4": [0.2, 0.2, 0.1, 0.1], "hybrid5": [0.2, 0.2, 0.1, 0.1, 0.1]}
 z = np.array(d["z"])
-print("== f -> 0: SquishierPlanet's oblate path vs MetalPlanet's spherical closed forms (fp64), same geometry ==")
+print("== f -> 0: SquishierPlanet's oblate path vs Elómë's spherical closed forms (fp64), same geometry ==")
 for law in ("hybrid2", "hybrid5"):
     with mx.stream(mx.cpu):
         Fs = 1.0 + np.asarray(mp.flux_dev_hybrid(mx.array(z, dtype=mx.float64), 0.1, W[law], law))
@@ -12,7 +12,7 @@ for law in ("hybrid2", "hybrid5"):
         Fe = np.array(d[f"F_{law}_{f}"])
         dmax = np.abs(Fe - Fs).max()
         print(f"  {law} f={f:<7g} max|F_oblate - F_sphere| = {dmax:.2e}" + (f"   / f = {dmax / f:.3e}" if f > 0 else ""))
-print("== MetalPlanet spherical cost, ns per point ==")
+print("== Elómë spherical cost, ns per point ==")
 for law in W:
     for n in (4096, 262144):
         zz = mx.array(np.tile(z, n // z.size + 1)[:n], dtype=mx.float64)

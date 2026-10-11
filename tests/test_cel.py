@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from scipy import special
 
-from metalplanet.ellip import cel, cel3
+from elome.ellip import cel, cel3
 from reference_limbdark import cel as cel_ref
 
 RNG = np.random.default_rng(7)

@@ -39,7 +39,7 @@ ROUTES = ("scalar", "basis", "three_scalar")
 def worker(route, grad, n, m, integration, reps):
     import numpy as np
     import mlx.core as mx
-    from metalplanet.metal import flux_dev_from_tau
+    from elome.metal import flux_dev_from_tau
 
     rng = np.random.default_rng(11)
     # phase-ordered: each chain's points ascend in tau, as turin feeds them

@@ -14,11 +14,11 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet
-from metalplanet.anvil import (DEFAULT_BOUNDS, PenalizedLogLike,
+import elome
+from elome.anvil import (DEFAULT_BOUNDS, PenalizedLogLike,
                                ecc_constraint_penalty, import_engine,
                                make_transit_target)
-from metalplanet.ld import u_to_q_np
+from elome.ld import u_to_q_np
 
 applemcmc, _ = import_engine()
 T0, PER, RP, A, INC = 2500.123456, 4.2345, 0.085, 11.3, 88.6
@@ -28,10 +28,10 @@ def _photometry(n=8000, yerr=3e-4, seed=7, ecc=0.0, w=90.0):
     """TESS-like BTJD timestamps, synthesised through the frontend."""
     rng = np.random.default_rng(seed)
     t = 2500.0 + np.sort(rng.uniform(0.0, 27.0, n))
-    p = metalplanet.TransitParams()
+    p = elome.TransitParams()
     p.t0, p.per, p.rp, p.a, p.inc = T0, PER, RP, A, INC
     p.ecc, p.w, p.u, p.limb_dark = ecc, w, [0.42, 0.21], "quadratic"
-    flux = metalplanet.TransitModel(p, t).light_curve(p)
+    flux = elome.TransitModel(p, t).light_curve(p)
     return t, flux + yerr * rng.standard_normal(n), yerr, flux
 
 

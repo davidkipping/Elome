@@ -2,8 +2,8 @@
 import sys, time, json, numpy as np, mlx.core as mx
 sys.path.insert(0, sys.path[0])
 from spike_kernel import build
-from metalplanet.hybrid import LAWS
-from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+from elome.hybrid import LAWS
+from elome.metal_hybrid import flux_dev_metal_hybrid
 route, law = sys.argv[1], sys.argv[2]
 L = LAWS[law]
 n_max = 2 if L.uses_mu4 else 1

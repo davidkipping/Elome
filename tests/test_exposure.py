@@ -13,18 +13,18 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet
-from metalplanet.exposure import contact_offsets, exposure_nodes, gauss_legendre
+import elome
+from elome.exposure import contact_offsets, exposure_nodes, gauss_legendre
 
 T = np.linspace(-0.13, 0.13, 261)
 EXP = 0.02          # ~29 min, a sixth of T14 — heavy smearing
 
 
 def _model(ecc=0.0, w=90.0, law="quadratic", u=(0.4, 0.25), **kw):
-    p = metalplanet.TransitParams()
+    p = elome.TransitParams()
     p.t0, p.per, p.rp, p.a, p.inc = 0.0, 3.456, 0.1, 8.8, 87.07
     p.ecc, p.w, p.u, p.limb_dark = ecc, w, list(u), law
-    return metalplanet.TransitModel(p, T, **kw), p
+    return elome.TransitModel(p, T, **kw), p
 
 
 class TestQuadratureMachinery:
@@ -127,12 +127,12 @@ class TestConvergence:
         the circular rule's accuracy. The reference is n_gl = 40, which
         converges to the exact integral however the window is split."""
         def lc(**kw):
-            p = metalplanet.TransitParams()
+            p = elome.TransitParams()
             p.t0, p.per, p.rp, p.a, p.inc = 0.0, 3.4525, 0.2, 10.0, 86.0
             p.ecc, p.w, p.u, p.limb_dark = 0.5, -40.0, [0.42, 0.31], \
                 "quadratic"
             t = np.linspace(-0.3, 0.3, 2001)
-            return metalplanet.TransitModel(
+            return elome.TransitModel(
                 p, t, exp_time=29.4 / 1440, integration="contact",
                 dtype=mx.float64, **kw).light_curve(p)
         assert np.abs(lc(n_gl=7) - lc(n_gl=40)).max() < 1e-7
@@ -197,11 +197,11 @@ class TestIntegrationWithTheRest:
         with pytest.raises(ValueError, match="supersample|contact"):
             _model(exp_time=EXP, integration="simpson")
         with pytest.raises(ValueError, match="primary"):
-            p = metalplanet.TransitParams()
+            p = elome.TransitParams()
             p.t0, p.per, p.rp, p.a, p.inc = 0.0, 3.456, 0.1, 8.8, 87.07
             p.ecc, p.w, p.u, p.limb_dark = 0.0, 90.0, [], "uniform"
             p.fp = 1e-3
-            metalplanet.TransitModel(p, T, transittype="secondary",
+            elome.TransitModel(p, T, transittype="secondary",
                                      exp_time=EXP, integration="contact")
 
 
@@ -227,10 +227,10 @@ class TestRegressions:
         ~1e-14; the weights are renormalised so a partition of unity
         really is one."""
         t = np.arange(-0.2, 2 * 3.456 + 0.2, 0.01)
-        p = metalplanet.TransitParams()
+        p = elome.TransitParams()
         p.t0, p.per, p.rp, p.a, p.inc = 0.0, 3.456, 0.1, 8.8, 87.07
         p.ecc, p.w, p.u, p.limb_dark = 0.0, 90.0, [0.4, 0.25], "quadratic"
-        f = metalplanet.TransitModel(
+        f = elome.TransitModel(
             p, t, exp_time=EXP, integration="contact", n_gl=7).light_curve(p)
         phase = np.abs(((t + 3.456 / 2) % 3.456) - 3.456 / 2)
         far = phase > 0.5 * 0.126 + EXP
@@ -241,23 +241,23 @@ class TestRegressions:
         """Contacts are placed relative to the nearest transit centre, so
         a series spanning several epochs must integrate each correctly."""
         t = np.arange(-0.2, 2 * 3.456 + 0.2, 0.005)
-        p = metalplanet.TransitParams()
+        p = elome.TransitParams()
         p.t0, p.per, p.rp, p.a, p.inc = 0.0, 3.456, 0.1, 8.8, 87.07
         p.ecc, p.w, p.u, p.limb_dark = 0.0, 90.0, [0.4, 0.25], "quadratic"
-        mk = metalplanet.TransitModel(p, t, exp_time=EXP,
+        mk = elome.TransitModel(p, t, exp_time=EXP,
                                       integration="contact", n_gl=7)
-        ref = metalplanet.TransitModel(p, t, exp_time=EXP,
+        ref = elome.TransitModel(p, t, exp_time=EXP,
                                        supersample_factor=4001)
         assert np.abs(mk.light_curve(p) - ref.light_curve(p)).max() < 2e-6
         assert (mk.light_curve(p) < 0.99).sum() > 10   # transits present
 
     def test_exposure_longer_than_the_transit(self):
         t = np.linspace(-0.13, 0.13, 201)
-        p = metalplanet.TransitParams()
+        p = elome.TransitParams()
         p.t0, p.per, p.rp, p.a, p.inc = 0.0, 3.456, 0.1, 8.8, 87.07
         p.ecc, p.w, p.u, p.limb_dark = 0.0, 90.0, [0.4, 0.25], "quadratic"
-        got = metalplanet.TransitModel(
+        got = elome.TransitModel(
             p, t, exp_time=0.30, integration="contact", n_gl=9).light_curve(p)
-        ref = metalplanet.TransitModel(
+        ref = elome.TransitModel(
             p, t, exp_time=0.30, supersample_factor=20001).light_curve(p)
         assert np.abs(got - ref).max() < 1e-6

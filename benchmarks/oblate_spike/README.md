@@ -4,7 +4,7 @@ Throwaway measurement code behind the "Stage 0 results" section of
 `docs/oblate-plan.md`. Not part of the package and not maintained; kept so
 the plan's numbers can be reproduced. Paths to SquishierPlanet and the
 scratch output directory are hard-coded; JAX scripts run in SquishierPlanet's
-venv, MLX/Metal ones in MetalPlanet's.
+venv, MLX/Metal ones in Elómë's.
 
 | script | question |
 |---|---|

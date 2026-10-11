@@ -23,8 +23,8 @@ import time
 import numpy as np
 import mlx.core as mx
 
-import metalplanet.metal as NEW
-from metalplanet.anchored import pack_orbit_constants
+import elome.metal as NEW
+from elome.anchored import pack_orbit_constants
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RETIRE_COMMIT = "6da12b4"        # the retirement; its parent has the kernel
@@ -32,9 +32,9 @@ RETIRE_COMMIT = "6da12b4"        # the retirement; its parent has the kernel
 
 def load_retired():
     src = subprocess.check_output(
-        ["git", "-C", ROOT, "show", f"{RETIRE_COMMIT}^:metalplanet/metal.py"],
+        ["git", "-C", ROOT, "show", f"{RETIRE_COMMIT}^:elome/metal.py"],
         text=True)
-    src = src.replace("from .vjp import", "from metalplanet.vjp import")
+    src = src.replace("from .vjp import", "from elome.vjp import")
     for tag in ("model_", "ecc_", "flux_"):
         src = src.replace(f'name="mp_{tag}', f'name="mp_retired_{tag}')
     path = os.path.join(tempfile.mkdtemp(), "metal_retired.py")

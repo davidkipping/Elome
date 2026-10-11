@@ -1,4 +1,4 @@
-"""Fused fp32 kernels for the hybrid laws (metalplanet/metal_hybrid.py).
+"""Fused fp32 kernels for the hybrid laws (elome/metal_hybrid.py).
 
 What is pinned:
 
@@ -21,12 +21,12 @@ import numpy as np
 import mlx.core as mx
 import pytest
 
-import metalplanet
+import elome
 from hybrid_weights import phys_w
-from metalplanet import metal as M
-from metalplanet import ld
-from metalplanet.hybrid import LAWS, hybrid_norms
-from metalplanet.metal import flux_dev_from_tau, flux_dev_metal, metal_available
+from elome import metal as M
+from elome import ld
+from elome.hybrid import LAWS, hybrid_norms
+from elome.metal import flux_dev_from_tau, flux_dev_metal, metal_available
 from test_tau_kernel import EXP, P, boundary_taus
 
 needs_metal = pytest.mark.skipif(not metal_available(),
@@ -80,7 +80,7 @@ class TestGraphPathVsTransitModel:
 
     def _api(self, law, w, integ, orbit, n_gl=5, ssf=1):
         g = GEOMS[0][1]
-        p = metalplanet.TransitParams()
+        p = elome.TransitParams()
         p.t0, p.per, p.rp, p.a = self.T0, P, g["r"], g["a"]
         if orbit is None:
             e, wdeg, ci = 0.0, 90.0, g["b"] / g["a"]
@@ -92,7 +92,7 @@ class TestGraphPathVsTransitModel:
             ci = g["b"] * (1 + esw) / (g["a"] * (1 - e * e))
         p.inc, p.ecc, p.w = math.degrees(math.acos(ci)), e, wdeg
         p.limb_dark, p.u = law, list(w)
-        m = metalplanet.TransitModel(
+        m = elome.TransitModel(
             p, self.T, exp_time=0.0 if integ == "none" else EXP,
             integration="supersample" if integ == "none" else integ,
             n_gl=n_gl, supersample_factor=ssf, dtype=mx.float64)
@@ -314,7 +314,7 @@ def test_no_nan_gradients_on_a_sweep(law):
 def test_flux_dev_metal_hybrid(dtype, law):
     if dtype == mx.float32 and not metal_available():
         pytest.skip("Metal unavailable")
-    from metalplanet.hybrid import flux_dev_hybrid
+    from elome.hybrid import flux_dev_hybrid
     z = np.concatenate([np.linspace(0.0, 1.45, 400),
                         [0.1153, 1 - 0.1153, 1 + 0.1153]])
     w = weights(law, 9)
@@ -466,8 +466,8 @@ def test_z_entry_fallback_is_flux_dev_hybrid_bitwise(law, dtype):
     """flux_dev_metal_hybrid off the kernel (fp64, or fp32 on the CPU
     stream) is flux_dev_hybrid's expression exactly -- not a dot-product
     contraction of the columns, which differed by 2.4e-7 in fp32."""
-    from metalplanet.hybrid import LAWS, flux_dev_hybrid
-    from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+    from elome.hybrid import LAWS, flux_dev_hybrid
+    from elome.metal_hybrid import flux_dev_metal_hybrid
     n_w = LAWS[law].n_w
     rng = np.random.default_rng(3)
     z = mx.array(np.sort(rng.uniform(0.0, 1.3, (3, 400)), axis=1), dtype=dtype)
@@ -500,8 +500,8 @@ def test_fp64_on_the_default_stream_falls_back_instead_of_raising(call):
     """Every z-input entry point, like the tau ones since 0.8.2, puts
     fp64 on the CPU stream itself: before 0.10.5 all five raised MLX's
     'float64 is not supported on the GPU' unless the caller knew to."""
-    from metalplanet.metal import flux_dev_metal
-    from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+    from elome.metal import flux_dev_metal
+    from elome.metal_hybrid import flux_dev_metal_hybrid
     z = mx.array(np.linspace(0.3, 1.2, 50), dtype=mx.float64)
     w = [0.2, 0.2, 0.1, 0.1]
     out = {
@@ -526,8 +526,8 @@ def test_tau_graph_combine_is_the_shared_expression_bitwise(law, dtype):
     hybrid.combine_cols over its own ld_basis columns, bitwise: the tau
     graph contracts with the one shared expression (0.10.4's dot product
     was 2.4e-7 apart in fp32)."""
-    from metalplanet.hybrid import LAWS, combine_cols
-    from metalplanet.metal import flux_dev_from_tau
+    from elome.hybrid import LAWS, combine_cols
+    from elome.metal import flux_dev_from_tau
     n_w = LAWS[law].n_w
     rng = np.random.default_rng(4)
     tau = mx.array(np.sort(rng.uniform(-0.12, 0.12, (3, 300)), axis=1),
@@ -553,8 +553,8 @@ W4 = [0.2, 0.2, 0.1, 0.1]
 
 
 def _entries(z, tau, r, u1, w):
-    from metalplanet.metal import flux_dev_from_tau, flux_dev_metal
-    from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+    from elome.metal import flux_dev_from_tau, flux_dev_metal
+    from elome.metal_hybrid import flux_dev_metal_hybrid
     return {
         "z-quadratic": lambda: flux_dev_metal(z, r, u1, 0.25),
         "z-ld_basis": lambda: flux_dev_metal(z, r, ld_basis=True),
@@ -620,8 +620,8 @@ def test_non_mlx_data_keeps_its_precision(entry, kind):
 def test_a_same_named_law_with_another_pole_gets_its_own_kernel():
     """Keyed by name, a user-built HybridLaw called "hybrid2" with another
     pole silently ran the registered hybrid2's compiled constants."""
-    from metalplanet.hybrid import HYBRID2, HybridLaw, flux_dev_hybrid
-    from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+    from elome.hybrid import HYBRID2, HybridLaw, flux_dev_hybrid
+    from elome.metal_hybrid import flux_dev_metal_hybrid
     other = HybridLaw("hybrid2", (0.15,), HYBRID2.shapes)
     w = [0.3, 0.2]
     z = mx.array(np.linspace(0.0, 1.15, 400, dtype=np.float32))
@@ -644,8 +644,8 @@ def test_a_same_named_law_with_another_pole_gets_its_own_kernel():
 
 @pytest.mark.skipif(not metal_available(), reason="Metal unavailable")
 def test_a_law_name_need_not_be_a_metal_identifier():
-    from metalplanet.hybrid import HYBRID2, HybridLaw, flux_dev_hybrid
-    from metalplanet.metal_hybrid import flux_dev_metal_hybrid
+    from elome.hybrid import HYBRID2, HybridLaw, flux_dev_hybrid
+    from elome.metal_hybrid import flux_dev_metal_hybrid
     law = HybridLaw("my hybrid2 @ eps=0.15", (0.15,), HYBRID2.shapes)
     z = mx.array(np.linspace(0.0, 1.15, 64, dtype=np.float32))
     got = np.asarray(flux_dev_metal_hybrid(z, 0.1, law, [0.3, 0.2]))
@@ -658,8 +658,8 @@ def test_a_law_name_need_not_be_a_metal_identifier():
 def test_a_renamed_registered_law_shares_its_kernels():
     """The cache identity is the definition: a copy of hybrid2 under another
     name compiles nothing new and computes bitwise the same."""
-    from metalplanet.hybrid import HYBRID2, HybridLaw
-    from metalplanet.metal_hybrid import _law_tag, flux_dev_metal_hybrid
+    from elome.hybrid import HYBRID2, HybridLaw
+    from elome.metal_hybrid import _law_tag, flux_dev_metal_hybrid
     copy = HybridLaw("mine", HYBRID2.eps, HYBRID2.shapes)
     assert _law_tag(copy) == "hybrid2" and copy.definition == HYBRID2.definition
     z = mx.array(np.linspace(0.0, 1.15, 200, dtype=np.float32))
@@ -690,8 +690,8 @@ def test_a_registered_name_need_not_be_a_metal_identifier():
     import sys
     code = (
         "import numpy as np, mlx.core as mx\n"
-        "from metalplanet import hybrid as H\n"
-        "from metalplanet.metal_hybrid import flux_dev_metal_hybrid\n"
+        "from elome import hybrid as H\n"
+        "from elome.metal_hybrid import flux_dev_metal_hybrid\n"
         "H.LAWS['my-law'] = H.HybridLaw('my-law', (0.3,), ((1, -1, 0),))\n"
         "z = mx.array(np.linspace(0.0, 1.15, 64, dtype=np.float32))\n"
         "k = np.asarray(flux_dev_metal_hybrid(z, 0.1, 'my-law', [0.3, 0.2]))\n"
