@@ -349,3 +349,25 @@ def test_contact_kernel_matches_the_fp64_graph(orbit):
             out[dt] = np.asarray(c.astype(mx.float32) if dt == mx.float32 else c,
                                  dtype=np.float64)
     assert np.abs(out[mx.float32] - out[mx.float64]).max() < 3e-6
+
+
+def test_contacts_are_solved_only_for_the_contact_rule():
+    """The other rules never read them (0.13.0 solved them every call)."""
+    seen = []
+    orig = MO.contact_offsets_oblate_kernel
+
+    def spy(*a, **k):
+        seen.append(1)
+        return orig(*a, **k)
+    MO.contact_offsets_oblate_kernel = spy
+    try:
+        tau = mx.array(np.stack([TAU] * 3).astype(np.float32))
+        kw = dict(limb_dark="hybrid4", u=W["hybrid4"], f=0.2, theta=0.4)
+        mx.eval(mp.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw))
+        mx.eval(mp.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw, exp_time=EXP,
+                                     integration="supersample", n_sub=5))
+        assert not seen
+        mx.eval(mp.flux_dev_from_tau(tau, P, A_RS, 0.3, 0.1, **kw, exp_time=EXP))
+        assert len(seen) == 1
+    finally:
+        MO.contact_offsets_oblate_kernel = orig

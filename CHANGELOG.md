@@ -5,6 +5,36 @@ All notable changes to MetalPlanet. Versioning: semantic-ish
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-10-11
+
+Code-review round on 0.13.0 (oblate frontend).
+
+### Fixed
+- **d/d(ecc) at e = 0 for an oblate `TransitModel`.** An array `ecc` went
+  through (k, h) = sqrt(e) (cos w, sin w), so `light_curve_mx`'s gradient
+  in ecc at e = 0 was wrong (-0.06 against the true one-sided +1.02 in
+  the reported case). It now enters as (e, w), as the spherical graph
+  does; the oblate kernels gained an (e, w) variant that keeps all nine
+  eccentric gradient slots (the (k, h) kernels drop seven on a circular
+  chain, exact only there).
+- **Out-of-range array eccentricities on an oblate model** (`mx.array(1.5)`,
+  `mx.array(-0.2)`) returned a plausible curve; they now raise when
+  readable and give NaN under `mx.compile`, as for a spherical model.
+- **`use_metal=False` was ignored for oblate models**: an fp32 model still
+  ran the Metal kernel. It now runs the graph (uncompiled on the GPU,
+  where the fp32 oblate graph exceeds MLX's fused-kernel argument limit).
+- **The fp32 oblate kernel route solved the contacts on every call**, also
+  for rules that never read them: 1.94 -> 0.70 ms at 4 x 500 points with
+  no exposure.
+- `oblate.axes` raised for a numpy array of f.
+
+### Changed
+- The impact parameter at conjunction on the oblate route comes from
+  `exposure.contact_geometry` (one copy, with its 1 - e^2 floor) in both
+  the single-set and batched paths; the oblate and hybrid branches of
+  `flux_dev_from_tau` share one set of argument checks; one helper states
+  the f / theta rule for `TransitModel`.
+
 ## [0.13.0] — 2026-10-10
 
 Oblate planets: an elliptical planet (area-equivalent radius, projected

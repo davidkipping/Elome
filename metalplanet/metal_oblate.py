@@ -905,7 +905,8 @@ inline void ob_xy_ecc_d(float tau, float per, float av,
                         thread const float *o, thread float *X,
                         thread float *Y, thread bool *front,
                         thread float *dXp, thread float *dYp,
-                        thread float *dXt, thread float *dYt) {
+                        thread float *dXt, thread float *dYt,
+                        bool all_slots) {
     float o_ecw = o[0], o_esw = o[1], o_es = o[2], o_ec = o[3];
     float o_b1 = o[4], o_a2 = o[5], o_b2 = o[6], o_e = o[7];
     float o_E0 = o[8], o_Mt = o[9], o_ci = o[10];
@@ -925,7 +926,10 @@ SOLVE
     dXt[0] = -uu / av;
     dYt[0] = -(vv * o_ci) / av;
     dYt[1] = -vv;
-    if (o_e != 0.0f) {
+    // the seven eccentric-only slots are exactly zero on a circular chain
+    // for (k, h), whose Jacobian vanishes at e = 0 -- but not for (e, w)
+    // (d(e cos w)/de = cos w): the (e, w) kernels keep them (all_slots)
+    if (all_slots || o_e != 0.0f) {
         dXt[2] = av * omcf;                          // ecw
         dYt[3] = av * o_ci;                          // esw
         dXt[4] = dud * omcf / Dk;                    // es (via delta)
@@ -940,7 +944,7 @@ SOLVE
 inline void ob_xy_ecc(float tau, float per, float av, thread const float *o,
                       thread float *X, thread float *Y, thread bool *front) {
     float a, b, ct[9], dt[9];
-    ob_xy_ecc_d(tau, per, av, o, X, Y, front, &a, &b, ct, dt);
+    ob_xy_ecc_d(tau, per, av, o, X, Y, front, &a, &b, ct, dt, false);
 }
 """
 
@@ -983,9 +987,15 @@ _OB_ORBITS = {
              "    for (int c = 0; c < NORB_I; ++c) "
              "o[c] = orb[y * NORB_C + (uint)c];\n",
         xy="ob_xy_ecc(TT, per, av, o, &X, &Y, &front);",
-        xyd="ob_xy_ecc_d(TT, per, av, o, &X, &Y, &front, &dXp, &dYp, dXt, dYt);",
+        xyd="ob_xy_ecc_d(TT, per, av, o, &X, &Y, &front, &dXp, &dYp, dXt, dYt, false);",
         nth=9, live="((o[7] != 0.0f) ? 9 : 2)"),
 }
+# the (e, w) route (TransitModel with an array ecc): every slot live, so
+# d/de is exact at e = 0 (see ob_xy_ecc_d)
+_OB_ORBITS["eccew"] = dict(
+    _OB_ORBITS["ecc"],
+    xyd="ob_xy_ecc_d(TT, per, av, o, &X, &Y, &front, &dXp, &dYp, dXt, dYt, true);",
+    live="9")
 
 _OB_HEAD = """
     uint x = thread_position_in_grid.x;
@@ -1199,7 +1209,7 @@ def _src(body: str, orbit: str, law, basis: bool, vjp: bool) -> str:
 
 def _header(law, orbit):
     hdr = M._HEADER + M._phot_header()
-    if orbit == "ecc":
+    if orbit in ("ecc", "eccew"):
         hdr += M._ecc_header()
         hdr += M._subst(_OB_ECC_FN.replace("SOLVE", M._SOLVE))
     hdr += M._subst(_OB_ORBIT_FN)
@@ -1295,22 +1305,34 @@ def _make_core(law, exp_time, mode, n_gl, n_sub, orbit, basis):
 
 def flux_dev_from_tau_oblate_kernel(tau2d, per_c, a_c, b_c, r_c, f_c, th_c,
                                     w2d, exp_time, mode, n_gl, n_sub, law,
-                                    basis=False, k=None, h=None):
+                                    basis=False, k=None, h=None, ew=False):
     """The fp32 kernel route of ``oblate_tau.flux_dev_from_tau_oblate``:
     canonical (n,) parameters in, (n, m) or (n, m, ncol) out. Contacts are
-    the oblate per-side ones (detached), as tau offsets."""
+    the oblate per-side ones (detached), as tau offsets, solved only for
+    the contact rule (the other rules never read them). ``ew``: (k, h)
+    hold (e, w) (oblate_tau._orbit_consts)."""
+    from .oblate_tau import _contact_kh, _orbit_consts
+    n = tau2d.shape[0]
     ecc = k is not None
+    contact = mode == M._INT_CONTACT and exp_time > 0.0
     if ecc:
-        ci = M._ecc_shape(a_c, b_c, k, h)[2]
         from .anchored import pack_orbit_constants
-        shape = pack_orbit_constants(k, h, ci)
-        cs = contact_offsets_oblate_kernel(a_c, b_c, r_c, f_c, th_c, k, h, ci)
+        ci, consts = _orbit_consts(a_c, b_c, k, h, ew)
+        shape = pack_orbit_constants(None, None, ci, consts=consts)
+        if contact:
+            kc, hc = _contact_kh(k, h, ew)
+            cs = contact_offsets_oblate_kernel(a_c, b_c, r_c, f_c, th_c, kc, hc,
+                                               ci, consts=consts)
     else:
         shape = b_c
-        cs = contact_offsets_oblate_kernel(a_c, b_c, r_c, f_c, th_c)
-    cs = mx.stop_gradient(cs * (per_c / (2.0 * math.pi))[:, None])
-    core = _make_core(law, exp_time, mode, n_gl, n_sub,
-                      "ecc" if ecc else "circ", basis)
+        if contact:
+            cs = contact_offsets_oblate_kernel(a_c, b_c, r_c, f_c, th_c)
+    if contact:
+        cs = mx.stop_gradient(cs * (per_c / (2.0 * math.pi))[:, None])
+    else:
+        cs = mx.zeros((n, 4), dtype=tau2d.dtype)
+    orbit = "circ" if not ecc else ("eccew" if ew else "ecc")
+    core = _make_core(law, exp_time, mode, n_gl, n_sub, orbit, basis)
     ws = () if basis else (w2d,)
     return core(tau2d, per_c, a_c, shape, r_c, f_c, th_c, *ws, cs)
 
@@ -1458,7 +1480,7 @@ _OB_CONTACT_ORBITS = {
                  xyd="ob_xy_circ_d(phi, MP_TWO_PI, av, bv, &X, &Y, &front, &dXp, &dYp, dXt, dYt);",
                  load="    float bv = bin[y];\n", inputs=["bin"], nth=2),
     "ecc": dict(args="float av, thread const float *o", pass_="av, o",
-                xyd="ob_xy_ecc_d(phi, MP_TWO_PI, av, o, &X, &Y, &front, &dXp, &dYp, dXt, dYt);",
+                xyd="ob_xy_ecc_d(phi, MP_TWO_PI, av, o, &X, &Y, &front, &dXp, &dYp, dXt, dYt, false);",
                 load="    float o[NORB_I];\n"
                      "    for (int c = 0; c < NORB_I; ++c) o[c] = orb[y * NORB_C + (uint)c];\n",
                 inputs=["orb"], nth=9),
@@ -1493,7 +1515,8 @@ def _contact_kernel(orbit):
     return M._kernels[key]
 
 
-def contact_offsets_oblate_kernel(a, b, r, f, theta, k=None, h=None, ci=None):
+def contact_offsets_oblate_kernel(a, b, r, f, theta, k=None, h=None, ci=None,
+                                  consts=None):
     """``oblate_tau.contact_offsets_oblate`` in one fp32 kernel launch:
     (n, 4) contact phases, detached. Same arguments."""
     from .exposure import contact_offsets, contact_offsets_anchored
@@ -1506,7 +1529,8 @@ def contact_offsets_oblate_kernel(a, b, r, f, theta, k=None, h=None, ci=None):
     else:
         from .anchored import anchor_constants, pack_orbit_constants
         k, h, ci = (mx.stop_gradient(v) for v in (k, h, ci))
-        consts = anchor_constants(k, h)
+        consts = tuple(mx.stop_gradient(c) for c in
+                       (anchor_constants(k, h) if consts is None else consts))
         orbit, shape = "ecc", pack_orbit_constants(k, h, ci, consts=consts)
         cA = contact_offsets_anchored(A, a, b, k, h, ci, consts=consts)
     st = mx.stack([mx.broadcast_to(c, (n,)) for c in cA], axis=1)

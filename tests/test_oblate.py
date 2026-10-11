@@ -114,6 +114,8 @@ def stress_sets():
 
 def test_axes_and_domain():
     A, B = O.axes(0.1, 0.3)
+    Av, Bv = O.axes(0.1, np.array([0.1, 0.3]))        # numpy f (0.13.0 raised)
+    assert np.allclose(Av * Bv, 0.01, rtol=1e-15, atol=0)
     assert abs(A * B - 0.01) < 1e-17 and abs(B / A - 0.7) < 1e-15
     assert O.max_r_eff(0.5) == pytest.approx(0.5 ** 1.5)
     with pytest.raises(ValueError, match="r_eff"):

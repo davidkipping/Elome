@@ -172,8 +172,10 @@ def _take(stacked, idx):
 # --------------------------------------------------------------------------
 
 def axes(r, f):
-    """(A, B): semi-axes of the area-equivalent ellipse, A B = r^2."""
-    A = r / mx.sqrt(1.0 - f) if isinstance(f, mx.array) else r / math.sqrt(1.0 - f)
+    """(A, B): semi-axes of the area-equivalent ellipse, A B = r^2. r and
+    f may be Python numbers, numpy arrays or mx.arrays."""
+    sqrt = mx.sqrt if isinstance(f, mx.array) else np.sqrt
+    A = r / sqrt(1.0 - f)
     return A, A * (1.0 - f)
 
 

@@ -198,3 +198,72 @@ def test_spherical_models_unchanged_by_the_new_fields():
     assert m._batch_keys == mp.TransitModel._BATCH_KEYS
     ref = mp.TransitModel(spherical(), T).light_curve(spherical())
     assert np.array_equal(m.light_curve(p), ref)
+
+
+# ---------------------------------------------------------------------------
+# v0.13.1 review fixes
+# ---------------------------------------------------------------------------
+
+def _one_sided_fd_ecc(m, w, h=1e-6):
+    """d/d(ecc) at e = 0 from the right, second order, fp64."""
+    def L(e):
+        return float(mx.sum(m.light_curve_mx(P(ecc=mx.array(e, dtype=mx.float64),
+                                               w=w))))
+    return (-3 * L(0.0) + 4 * L(h) - L(2 * h)) / (2 * h)
+
+
+@pytest.mark.parametrize("dtype", [mx.float64, mx.float32], ids=["fp64", "fp32"])
+def test_array_ecc_gradient_at_zero_is_the_one_sided_derivative(dtype):
+    """An array ecc enters as (e, w), exact at e = 0 (0.13.0 went through
+    sqrt(e) and returned -0.06 against the true +1.02 here)."""
+    with mx.stream(mx.cpu):
+        ref = _one_sided_fd_ecc(mp.TransitModel(P(w=40.0), T), 40.0)
+    stream = mx.cpu if dtype == mx.float64 else mx.gpu
+    with mx.stream(stream):
+        m = mp.TransitModel(P(w=40.0), T, dtype=dtype)
+        g = float(mx.grad(lambda e: mx.sum(m.light_curve_mx(P(ecc=e, w=40.0))))(
+            mx.array(0.0, dtype=dtype)))
+    tol = 1e-6 if dtype == mx.float64 else 1e-4
+    assert abs(g - ref) <= tol * abs(ref)
+
+
+def test_array_and_python_ecc_routes_agree():
+    with mx.stream(mx.cpu):
+        m = mp.TransitModel(P(), T)
+        for e, w in ((0.2, 30.0), (0.6, -70.0)):
+            arr = np.asarray(m.light_curve_mx(P(ecc=mx.array(e, dtype=mx.float64), w=w)))
+            assert np.abs(arr - m.light_curve(P(ecc=e, w=w))).max() < 1e-13
+
+
+def test_array_ecc_out_of_range_raises_or_is_nan():
+    with mx.stream(mx.cpu):
+        m = mp.TransitModel(P(), T)
+        for e in (1.5, -0.2, 1.0):
+            with pytest.raises(ValueError, match="eccentricity"):
+                m.light_curve_mx(P(ecc=mx.array(e, dtype=mx.float64)))
+        comp = mx.compile(lambda e: m.light_curve_mx(P(ecc=e)))
+        assert np.isnan(np.asarray(comp(mx.array(1.5, dtype=mx.float64)))).all()
+        assert np.isfinite(np.asarray(comp(mx.array(0.3, dtype=mx.float64)))).all()
+
+
+@pytest.mark.skipif(not KERNEL, reason="needs Metal and the GPU stream")
+@pytest.mark.parametrize("kw", [{}, {"integration": "contact", "exp_time": EXP}],
+                         ids=["none", "contact"])
+def test_use_metal_false_runs_the_graph(kw):
+    from metalplanet import metal_oblate as MO
+    seen = []
+    orig = MO.flux_dev_from_tau_oblate_kernel
+
+    def spy(*a, **k):
+        seen.append(1)
+        return orig(*a, **k)
+    MO.flux_dev_from_tau_oblate_kernel = spy
+    try:
+        p = P(rp=0.1021)
+        off = mp.TransitModel(p, T, dtype=mx.float32, use_metal=False, **kw).light_curve(p)
+        assert not seen
+        on = mp.TransitModel(p, T, dtype=mx.float32, **kw).light_curve(p)
+        assert seen
+    finally:
+        MO.flux_dev_from_tau_oblate_kernel = orig
+    assert np.abs(on - off).max() < 3e-7

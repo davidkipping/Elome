@@ -157,15 +157,17 @@ def _newton_contact(phi, a, b, ecc, A, B, cth, sth, kind, side, lim, n):
     return phi, g
 
 
-def contact_offsets_oblate(a, b, r, f, theta, k=None, h=None, ci=None):
+def contact_offsets_oblate(a, b, r, f, theta, k=None, h=None, ci=None,
+                           consts=None):
     """The four contact phases (ingress outer, ingress inner, egress inner,
     egress outer) of an oblate planet, as offsets from mid-transit
     (phi = 2 pi (t - t0) / P), per chain and detached; ordered.
 
     a, b, r, f, theta: (n,) arrays of one dtype. Give (k, h, ci) for the
-    transit-anchored eccentric orbit. A missing contact collapses onto a
-    point inside the transit (the inner pair of a graze), or all four onto
-    one point (no transit)."""
+    transit-anchored eccentric orbit (``consts``, if given, replaces
+    anchor_constants(k, h) -- the (e, w) route). A missing contact collapses
+    onto a point inside the transit (the inner pair of a graze), or all four
+    onto one point (no transit)."""
     from .exposure import contact_offsets, contact_offsets_anchored
     a, b, r, f, theta = (mx.stop_gradient(v) for v in (a, b, r, f, theta))
     dt = a.dtype
@@ -177,7 +179,8 @@ def contact_offsets_oblate(a, b, r, f, theta, k=None, h=None, ci=None):
     else:
         from .anchored import anchor_constants
         k, h, ci = (mx.stop_gradient(v) for v in (k, h, ci))
-        consts = anchor_constants(k, h)
+        consts = tuple(mx.stop_gradient(c) for c in
+                       (anchor_constants(k, h) if consts is None else consts))
         ecc = (ci, consts)
         cA = contact_offsets_anchored(A, a, b, k, h, ci, consts=consts)
     sth, cth = sincos(theta)
@@ -206,8 +209,34 @@ def contact_offsets_oblate(a, b, r, f, theta, k=None, h=None, ci=None):
 # the graph
 # --------------------------------------------------------------------------
 
+def _orbit_consts(a, b, k, h, ew=False):
+    """(cos i, anchored constants) of the transit-anchored orbit, from b
+    at conjunction and (k, h) = sqrt(e) (cos w, sin w) -- or, with ``ew``,
+    from (k, h) holding (e, w [rad]) themselves (anchor_constants_ew):
+    exact in d/de at e = 0, where the (k, h) map is singular (TransitModel's
+    array-ecc route). cos i is metal._ecc_shape's, written in (e, e sin w)."""
+    from .anchored import anchor_constants, anchor_constants_ew
+    if not ew:
+        return M._ecc_shape(a, b, k, h)[2], anchor_constants(k, h)
+    e, w = k, h
+    esw = e * sincos(w)[0]
+    ci = b * (1.0 + esw) / (a * mx.maximum(1.0 - e * e,
+                                           1.0 - M._E_MAX * M._E_MAX))
+    return ci, anchor_constants_ew(e, w)
+
+
+def _contact_kh(k, h, ew):
+    """(k, h) for the detached contact starts; on the (e, w) route,
+    sqrt(e) (cos w, sin w) -- the contacts carry no gradient."""
+    if not ew:
+        return k, h
+    s, c = sincos(h)
+    sq = mx.sqrt(mx.maximum(k, 0.0))
+    return mx.stop_gradient(sq * c), mx.stop_gradient(sq * s)
+
+
 def _tau_graph(tau, period, a, b, r, f, theta, w2d, exp_time, mode, n_gl,
-               n_sub, law, basis=False, k=None, h=None):
+               n_sub, law, basis=False, k=None, h=None, ew=False):
     """The oblate counterpart of ``metal_hybrid._tau_graph``: the same
     exposure rules, contacts detached and the period detached in the node
     map exactly as there."""
@@ -223,10 +252,8 @@ def _tau_graph(tau, period, a, b, r, f, theta, w2d, exp_time, mode, n_gl,
         per, av, bv = cols[:3]
         if not ecc:
             return per, av, bv, None
-        from .anchored import anchor_constants
         kv, hv = cols[-2:]
-        ci = M._ecc_shape(av, bv, kv, hv)[2]
-        return per, av, bv, (ci, anchor_constants(kv, hv))
+        return per, av, bv, _orbit_consts(av, bv, kv, hv, ew)
 
     def inst(tt, nk):
         cols = col(nk)
@@ -250,8 +277,10 @@ def _tau_graph(tau, period, a, b, r, f, theta, w2d, exp_time, mode, n_gl,
     else:
         per1 = col(1)[0]
         if ecc:
-            ci = M._ecc_shape(a, b, k, h)[2]
-            cs = contact_offsets_oblate(a, b, r, f, theta, k, h, ci)
+            ci, consts = _orbit_consts(a, b, k, h, ew)
+            kc, hc = _contact_kh(k, h, ew)
+            cs = contact_offsets_oblate(a, b, r, f, theta, kc, hc, ci,
+                                        consts=consts)
         else:
             cs = contact_offsets_oblate(a, b, r, f, theta)
         cs = tuple(mx.reshape(c, (-1, 1)) for c in cs)
@@ -266,11 +295,12 @@ def _tau_graph(tau, period, a, b, r, f, theta, w2d, exp_time, mode, n_gl,
 @fp64_on_cpu
 def flux_dev_from_tau_oblate(tau, period, a, b, r, f, theta, law, u,
                              exp_time, mode, n_gl, n_sub, basis=False,
-                             k=None, h=None):
+                             k=None, h=None, ew=False, use_metal=True):
     """``metal.flux_dev_from_tau`` with ``f=`` (that function validates the
     keywords and delegates here). fp32 data on the GPU stream takes the
-    oblate Metal kernels (``metal_oblate``); anything else runs this
-    graph, fp64 on the CPU stream."""
+    oblate Metal kernels (``metal_oblate``) unless ``use_metal`` is False;
+    anything else runs this graph, fp64 on the CPU stream. ``ew``: (k, h)
+    hold (e, w [rad]) -- TransitModel's array-ecc route (_orbit_consts)."""
     from .metal_hybrid import _canon_w
     law = get_law(law)
     if tau.ndim not in (1, 2):
@@ -291,16 +321,16 @@ def flux_dev_from_tau_oblate(tau, period, a, b, r, f, theta, law, u,
     kh = pc[-2:] if ecc else [None, None]
     w2d = (None if basis else
            _canon_w(u, n, law.n_w, tau2d.dtype, law.name))
-    if (tau2d.dtype == mx.float32 and M._gpu_stream_active()
+    if (use_metal and tau2d.dtype == mx.float32 and M._gpu_stream_active()
             and M.metal_available()):
         from .metal_oblate import flux_dev_from_tau_oblate_kernel
         from .oblate import _in_domain
         out = flux_dev_from_tau_oblate_kernel(
             tau2d, *pc[:6], w2d, exp_time, mode, n_gl, n_sub, law,
-            basis=basis, k=kh[0], h=kh[1])
+            basis=basis, k=kh[0], h=kh[1], ew=ew)
         ok = _in_domain(pc[3], pc[4])[:, None]
         out = mx.where(ok[..., None] if basis else ok, out, mx.nan)
     else:
         out = _tau_graph(tau2d, *pc[:6], w2d, exp_time, mode, n_gl, n_sub,
-                         law, basis=basis, k=kh[0], h=kh[1])
+                         law, basis=basis, k=kh[0], h=kh[1], ew=ew)
     return out[0] if squeeze and n == 1 else out

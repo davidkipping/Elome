@@ -1704,31 +1704,26 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
         mode = _INT_NONE
     if (secosw is None) != (sesinw is None):
         raise ValueError("pass both secosw and sesinw, or neither")
-    if f is not None or theta is not None:
-        if f is None:
-            raise ValueError("theta= is an oblate planet's; pass f= too")
-        if limb_dark == "quadratic":
-            raise ValueError("oblate planets (f=) take a hybrid law: "
-                             "limb_dark='hybrid2' | 'hybrid4' | 'hybrid5'")
-        if u1 is not None or u2 is not None:
-            raise ValueError("u1/u2 are the quadratic law's coefficients; "
-                             f"pass the {limb_dark} weights as u=")
-        if u is None and not ld_basis:
-            raise ValueError(f"{limb_dark} needs its weights as u= unless "
-                             "ld_basis=True")
-        from .oblate_tau import flux_dev_from_tau_oblate
-        return flux_dev_from_tau_oblate(
-            tau, period, a, b, r, f, 0.0 if theta is None else theta,
-            limb_dark, u, float(exp_time), mode, int(n_gl), int(n_sub),
-            bool(ld_basis), secosw, sesinw)
+    if theta is not None and f is None:
+        raise ValueError("theta= is an oblate planet's; pass f= too")
+    if f is not None and limb_dark == "quadratic":
+        raise ValueError("oblate planets (f=) take a hybrid law: "
+                         "limb_dark='hybrid2' | 'hybrid4' | 'hybrid5'")
     if limb_dark != "quadratic":
-        # a hybrid law (metal_hybrid.py); its own kernels, nothing below
+        # a hybrid law: metal_hybrid.py, or oblate_tau.py for an oblate
+        # planet; their own kernels, nothing below
         if u1 is not None or u2 is not None:
             raise ValueError("u1/u2 are the quadratic law's coefficients; "
                              f"pass the {limb_dark} weights as u=")
         if u is None and not ld_basis:
             raise ValueError(f"{limb_dark} needs its weights as u= unless "
                              "ld_basis=True")
+        if f is not None:
+            from .oblate_tau import flux_dev_from_tau_oblate
+            return flux_dev_from_tau_oblate(
+                tau, period, a, b, r, f, 0.0 if theta is None else theta,
+                limb_dark, u, float(exp_time), mode, int(n_gl), int(n_sub),
+                bool(ld_basis), secosw, sesinw)
         from .metal_hybrid import flux_dev_from_tau_hybrid
         return flux_dev_from_tau_hybrid(
             tau, period, a, b, r, limb_dark, u, float(exp_time), mode,
