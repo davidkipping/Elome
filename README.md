@@ -427,6 +427,9 @@ dev = flux_dev_from_tau(tau, period, a, b, r, limb_dark="hybrid5", u=w,
                         exp_time=29.4 / 60 / 24, integration="contact")
 ```
 
+A step-by-step tutorial, with spherical and oblate planets side by side:
+[notebooks/03_spherical_and_oblate_planets.ipynb](notebooks/03_spherical_and_oblate_planets.ipynb).
+
 Everything the spherical hybrid path does carries over: `light_curve`,
 `light_curves` (per-set f and theta), `light_curve_mx` (differentiable in
 f and theta too), every exposure rule, eccentric orbits, `ld_basis=True`,

@@ -244,6 +244,46 @@ the pure forward kernel — 17.5 ms at 1024×65k (`examples/bench_vjp.py`).
 Gradient samplers (ChEES-HMC) pay 52.5 ms for value+gradient — ~3× a
 forward, 519× cheaper than reverse-mode autodiff.
 
+## Sampling an oblate planet
+
+An oblate planet (v0.13) adds two parameters, the projected flattening `f`
+and the long axis's sky angle `theta`, on the same entry point:
+
+```python
+dev = flux_dev_from_tau(tau, period, a, b, r, limb_dark="hybrid5", u=w,
+                        f=f, theta=theta,          # (n,) per chain; theta in radians
+                        exp_time=EXP, integration="contact")
+```
+
+Everything above applies -- per-chain parameters, float32 on the GPU,
+one launch per step, analytic gradients in every input including `f` and
+`theta`, and `ld_basis=True` for collapsing the limb-darkening weights.
+What is specific to it:
+
+- **Cost.** One evaluation costs 16-37x a spherical hybrid one on the GPU,
+  and ~80x under the contact rule (whose spherical kernel is unusually
+  cheap per node); `benchmarks/bench_oblate.py`. Collapsing the
+  limb-darkening weights (SquishierPlanet's path B, 10-100x in effective
+  samples per second there) recovers more than that.
+- **Hybrid laws only.** The quadratic law raises with `f`. Prefer hybrid4
+  or hybrid5: a quadratic-class law can fake a confident oblateness signal
+  on a spherical planet.
+- **theta has period pi.** The ellipse is symmetric, so sample theta on
+  [0, pi) and wrap, or the posterior has two identical modes.
+- **The domain** is r <= (1 - f)^(3/2). Out of it an array argument gives
+  NaN (a sampler reads -inf), so a box prior on f must respect it at the
+  largest r the chains reach.
+- **Near f = 0** in float32 the model uses the spherical forms below
+  f = 1e-5, so d/df is 0 in that band (the flux changes by < 4e-8 there).
+  A chain started at f = 0 moves off it on the likelihood, not the
+  gradient; starting at a small positive f avoids the flat band.
+- **f and theta are near-degenerate on central transits** (b ~ 0): an
+  aligned oblate planet and a round one at slightly different b can look
+  alike. That is a parameterisation and prior question for the sampler.
+
+A worked, step-by-step comparison with a spherical planet is
+`notebooks/03_spherical_and_oblate_planets.ipynb`.
+
 ## Practical limits and conditioning
 
 - **Memory, forward**: the fused kernel keeps intermediates in

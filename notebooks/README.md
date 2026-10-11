@@ -4,9 +4,10 @@
 |---|---|
 | `01_metalplanet_with_anvil.ipynb` | Forward modelling (orbits, limb darkening, finite exposures, batching) and fitting real Kepler/TESS-style photometry with anvil's gradient-based HMC. |
 | `02_joint_transit_and_gp.ipynb` | Fitting a transit **and** correlated stellar variability together: MetalPlanet as the mean model, anvil-gp's Gaussian process over the residual, all twelve parameters sampled at once. Needs `anvilgp`. |
+| `03_spherical_and_oblate_planets.ipynb` | Spherical and oblate planets side by side: the same steps (light curves, hybrid limb darkening, exposures, gradients, batching, the sampler-facing `flux_dev_from_tau`) for each, then what is new for an oblate planet -- its geometry, the oblateness signal, per-side contacts, cost and limits. Needs only `metalplanet`. |
 
 Run them in the environment that has `metalplanet` and `anvil` installed;
-notebook 02 also needs `anvilgp`.
+notebook 02 also needs `anvilgp`; notebook 03 needs only `metalplanet`.
 `matplotlib` is optional — every cell prints its numbers, and figures appear
 only if it is importable.
 
@@ -15,6 +16,7 @@ code live in reviewable source rather than in JSON:
 
 ```
 python notebooks/build_01.py notebooks/01_metalplanet_with_anvil.ipynb
+python notebooks/build_03.py notebooks/03_spherical_and_oblate_planets.ipynb
 ```
 
 Every code cell is executed before the notebook is committed. The committed
