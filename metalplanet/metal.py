@@ -1256,9 +1256,17 @@ def _get_tau_g_kernels(orbit: str, basis: bool):
     return _kernels[key]
 
 
-def metal_available() -> bool:
-    """Probe: can the fused kernel actually run on this machine?"""
+def metal_available(reprobe: bool = False) -> bool:
+    """Probe: can the fused kernel actually run on this machine?
+
+    The answer is cached for the process. A failure is not silent: it
+    warns once, with the exception, because every fp32 caller then takes
+    the MLX graph instead (correct, ~10x slower). ``reprobe=True`` forgets
+    the cached answer and probes again (after a transient device error,
+    say)."""
     global _metal_ok
+    if reprobe:
+        _metal_ok = None
     if _metal_ok is None:
         try:
             k = _get_kernels()["fwd"]
@@ -1268,8 +1276,15 @@ def metal_available() -> bool:
                     grid=(4, 1, 1), threadgroup=(64, 1, 1))[0]
             mx.eval(out)
             _metal_ok = True
-        except Exception:
+        except Exception as err:          # noqa: BLE001 -- reported below
             _metal_ok = False
+            import warnings
+            warnings.warn(
+                "MetalPlanet's Metal kernels are unavailable on this "
+                f"machine ({type(err).__name__}: {err}); float32 calls use "
+                "the MLX graph instead (same results, ~10x slower). "
+                "metal_available(reprobe=True) probes again.",
+                RuntimeWarning, stacklevel=2)
     return _metal_ok
 
 
@@ -1454,8 +1469,8 @@ def _ecc_shape(a, b, k, h):
     """
     e = k * k + h * h
     esw = h * mx.sqrt(mx.maximum(e, 1e-30))
-    ci = b * (1.0 + esw) / (a * mx.maximum(1.0 - e * e,
-                                           1.0 - _E_MAX * _E_MAX))
+    from .anchored import cos_inc_from_b
+    ci = cos_inc_from_b(a, b, e, esw, _E_MAX)
     return e, esw, ci
 
 

@@ -11,8 +11,9 @@ notebook 02 also needs `anvilgp`; notebook 03 needs only `metalplanet`.
 `matplotlib` is optional — every cell prints its numbers, and figures appear
 only if it is importable.
 
-The notebooks are **generated** from a sibling `build_*.py` so the prose and
-code live in reviewable source rather than in JSON:
+The notebooks are **generated** from a sibling `build_*.py` (sharing one
+writer, `_nbwriter.py`) so the prose and code live in reviewable source
+rather than in JSON:
 
 ```
 python notebooks/build_01.py notebooks/01_metalplanet_with_anvil.ipynb
@@ -23,8 +24,8 @@ Every code cell is executed before the notebook is committed. The committed
 copy is stored without outputs, so opening it gives a clean run rather than
 someone else's stale numbers.
 
-Measured on an M2 Max, both notebooks produce healthy fits at the settings
-committed: notebook 01 reaches 0 divergences and R-hat 1.002 in ~25 s;
+Measured on an M2 Max, notebooks 01 and 02 (the two that fit data) produce
+healthy fits at the settings committed: notebook 01 reaches 0 divergences and R-hat 1.002 in ~25 s;
 notebook 02's twelve-parameter joint fit reaches 0 divergences, R-hat 1.001 and
 every parameter within 1.2 sigma in ~2 minutes.
 

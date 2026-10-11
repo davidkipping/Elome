@@ -155,3 +155,52 @@ class TestTarget:
         assert np.isfinite(np.array(val)).all()
         assert np.isfinite(np.array(grad)).all()
         assert np.abs(np.array(grad)).max() > 0.0
+
+
+# ---------------------------------------------------------------------------
+# v0.13.2 production review
+# ---------------------------------------------------------------------------
+
+def test_penalty_gradient_finite_at_zero_eccentricity_in_fp32():
+    """Chains start at e = 0; 0.13.1 returned NaN d/d(secosw, sesinw) in
+    fp32 there (the penalty re-derived e sin w through an unsafe branch)."""
+    for e_comp in (0.0, 1e-12, 1e-6):
+        v = mx.array([[0, 0, 0.1, 0.3, 8.8, 0.4, 0.3, e_comp, e_comp, 0]],
+                     dtype=mx.float32)
+        g = mx.grad(lambda v: mx.sum(ecc_constraint_penalty(v)))(v)
+        assert np.isfinite(np.asarray(g)).all(), e_comp
+
+
+def test_penalized_loglike_hi_runs_from_the_default_stream():
+    tg = make_ecc_target(n_data=2000)
+    v = mx.array(tg.truth_model[None, :], dtype=mx.float32)
+    hi = tg.loglike.hi(v)                       # raised "float64 ... GPU"
+    assert np.isfinite(np.asarray(hi)).all()
+
+
+def test_core_names_are_shared_by_both_factories():
+    from metalplanet.anvil import make_quad_transit_flux, make_ecc_transit_flux
+    x = mx.array(epoch_center_times(np.linspace(-0.1, 0.1, 50), 0.0, 3.45),
+                 dtype=mx.float64)
+    v8 = mx.array([[0, 0, 0.1, 0.3, 8.8, 0.4, 0.3, 0]], dtype=mx.float64)
+    v10 = mx.array([[0, 0, 0.1, 0.3, 8.8, 0.4, 0.3, 0.3, 0.2, 0]], dtype=mx.float64)
+    with mx.stream(mx.cpu):
+        for core in ("metal", "analytic", "graph", "autodiff"):
+            a = np.asarray(make_quad_transit_flux(3.45, core=core)(v8, x))
+            b = np.asarray(make_ecc_transit_flux(3.45, core=core)(v10, x))
+            assert np.isfinite(a).all() and np.isfinite(b).all(), core
+        with pytest.raises(ValueError, match="unknown core"):
+            make_ecc_transit_flux(3.45, core="nope")
+
+
+def test_import_engine_reports_a_broken_anvil(monkeypatch):
+    import importlib.machinery
+    import sys
+    import types
+    fake = types.ModuleType("anvil")
+    fake.__spec__ = importlib.machinery.ModuleSpec("anvil", None)
+    monkeypatch.setitem(sys.modules, "anvil", fake)
+    for name in [k for k in sys.modules if k.startswith("anvil.")]:
+        monkeypatch.delitem(sys.modules, name)
+    with pytest.raises(ImportError, match="is not the anvil MCMC engine"):
+        import_engine()

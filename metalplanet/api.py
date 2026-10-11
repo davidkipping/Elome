@@ -54,6 +54,7 @@ from .metal_hybrid import flux_dev_metal_hybrid
 from .anchored import anchor_constants_ew, separation_anchored
 from .hybrid import LAWS as _HYBRID_LAWS, find_law as _hybrid_law
 from .hybrid import flux_dev_hybrid
+from .vjp import flux_dev_analytic
 from .poly import flux_dev_poly
 from .exposure import (contact_geometry, contact_offsets,
                        contact_offsets_anchored, exposure_nodes)
@@ -246,6 +247,54 @@ def _check_ecc(ecc):
             f"{ecc[bad][:4]} (and possibly more)"))
 
 
+_GEOM_RULES = (("rp", "rp must be >= 0", lambda v: v >= 0.0),
+               ("a", "a must be > 1 (stellar radii)", lambda v: v > 1.0),
+               ("per", "per must be > 0", lambda v: v > 0.0))
+
+
+def _check_geometry(params):
+    """rp >= 0, a > 1, per > 0 (and finite) for the readable fields --
+    Python numbers, numpy values, and mx.arrays outside a trace; returns
+    the traced mx.array fields, which cannot be read (mx.compile / vmap)
+    and are masked to NaN in the graph instead (_geometry_mask). A
+    negative rp otherwise returns a finite, deeper, wrong transit."""
+    traced = []
+    for name, msg, ok in _GEOM_RULES:
+        x = getattr(params, name)
+        if isinstance(x, mx.array):
+            v = _scalar_value(x)
+            if v is None:
+                traced.append(name)
+                continue
+        else:
+            v = x
+        vals = np.atleast_1d(np.asarray(v, dtype=np.float64))
+        bad = ~(np.isfinite(vals) & ok(vals))
+        if bool(np.any(bad)):
+            raise ValueError(f"{msg}; got {vals[bad][:4]}")
+    return traced
+
+
+def _check_geometry_cols(cols):
+    """_check_geometry's rules on light_curves' (n_sets,) columns."""
+    for name, msg, ok in _GEOM_RULES:
+        vals = cols[name]
+        bad = ~(np.isfinite(vals) & ok(vals))
+        if bool(np.any(bad)):
+            raise ValueError(f"{msg}; got {vals[bad][:4]}")
+
+
+def _geometry_mask(traced, values, dtype):
+    """1.0, or NaN where a traced field breaks its rule (_check_geometry)."""
+    ok = None
+    rules = {name: rule for name, _, rule in _GEOM_RULES}
+    for name in traced:
+        v = values[name]
+        c = mx.logical_and(rules[name](v), v == v)
+        ok = c if ok is None else mx.logical_and(ok, c)
+    return mx.where(ok, 1.0, float("nan")).astype(dtype)
+
+
 def _ld_coeffs_batch(law, u):
     """(u1, u2) columns for the legacy laws, from a (n_sets, N) array."""
     if law == "uniform":
@@ -375,7 +424,10 @@ class TransitModel:
                     return 1.0 + flux_dev_poly(z_eff, rp, uvec,
                                                n_max=self._n_vec)
                 return 1.0 + self._hybrid_dev(z_eff, rp, uvec)
-            core = flux_dev_metal if self.use_metal else flux_dev
+            # use_metal=False: the analytic core (flux_dev_metal's own
+            # fallback), not flux_dev, whose reverse mode is NaN at r = 0
+            # and at r = 1, z = 0
+            core = flux_dev_metal if self.use_metal else flux_dev_analytic
             return 1.0 + core(z_eff, rp, u1, u2)
         z_eff = mx.where(front, z + 2.0 * (1.0 + rp), z)
         s0d, _, _ = sn_dev(z_eff, rp)
@@ -641,6 +693,40 @@ class TransitModel:
         if self._oblate:
             return self._oblate_eval(params, uv, cast, rad, is_arr)
 
+        t0_off, per, a, rp, ci, ci_py, gmask = self._prep(params, cast, rad,
+                                                          is_arr)
+        fp = cast(0.0 if params.fp is None else params.fp)
+        if self._n_vec:
+            ld = (cast(uv),)
+        else:
+            ld = _ld_coeffs(params, conv=cast, u=uv)
+
+        route = self._ecc_route(params, cast, rad, is_arr)
+        if route[0] == "ew":
+            _, e, wr, emask = route
+            f = self._get_compiled(False, ew=True)(
+                t0_off, per, a, e, wr, ci, rp, *ld, fp)
+        elif route[0] == "circ":                      # w is irrelevant
+            emask = None
+            b = (a * ci if is_arr(params.a) or is_arr(params.inc)
+                 else cast(float(params.a) * ci_py))
+            f = self._get_compiled(True)(t0_off, per, a, b, rp, *ld, fp)
+        else:
+            _, k, h, _, _ = route
+            emask = None
+            f = self._get_compiled(False)(t0_off, per, a, k, h, ci, rp,
+                                          *ld, fp)
+        return self._apply_masks(f, emask, gmask)
+
+    # -- parameter preparation shared by the spherical and oblate paths ---
+
+    def _prep(self, params, cast, rad, is_arr):
+        """(t0_off, per, a, rp, cos i, cos i as a Python float or None,
+        geometry mask or None). Python fields fold on the host in fp64 and
+        cast once; mx.array fields stay in the graph. Readable geometry
+        is validated (_check_geometry); traced fields get a NaN mask."""
+        dt = self.dtype
+        traced = _check_geometry(params)
         t0 = params.t0
         if is_arr(t0):
             # the reference-time subtraction in fp64, then the model dtype
@@ -648,53 +734,57 @@ class TransitModel:
                 t0_off = (t0.astype(mx.float64) - self._t_ref).astype(dt)
         else:
             t0_off = cast(t0 - self._t_ref)
-
         inc = params.inc
         if is_arr(inc):
-            ci = sincos(rad(inc))[1]      # fp64-accurate (MLX's cos is not)
+            ci, ci_py = sincos(rad(inc))[1], None   # fp64-accurate (MLX's cos is not)
         else:
             ci_py = math.cos(math.radians(float(inc)))
             ci = cast(ci_py)
-        fp = cast(0.0 if params.fp is None else params.fp)
         per, a, rp = cast(params.per), cast(params.a), cast(params.rp)
+        gmask = (_geometry_mask(traced, {"rp": rp, "a": a, "per": per}, dt)
+                 if traced else None)
+        return t0_off, per, a, rp, ci, ci_py, gmask
 
-        if self._n_vec:
-            ld = (cast(uv),)
-        else:
-            ld = _ld_coeffs(params, conv=cast, u=uv)
-
-        ecc = params.ecc
+    def _ecc_route(self, params, cast, rad, is_arr):
+        """How the orbit enters the graph, validated:
+          ("ew", e, w [rad], NaN mask or None)  an mx.array ecc: (e, w),
+              exact in d/de at e = 0 (anchored.anchor_constants_ew);
+          ("circ",)                              a Python e = 0;
+          ("kh", k, h, e, sqrt(e))               a Python e > 0: (k, h) =
+              sqrt(e) (cos w, sin w), smooth in w for fixed e.
+        An array e is checked when readable; traced it cannot be, and an
+        out-of-range value makes the output (and gradients) NaN instead --
+        validated as the value the GRAPH sees (an fp64 e just below 1 can
+        round to 1 in fp32)."""
+        ecc, w = params.ecc, params.w
         if is_arr(ecc):
-            # Validate the value the GRAPH will see: an fp64 e just below
-            # 1 can round to exactly 1 in fp32. Readable (eagerly, under
-            # mx.grad) it raises like a number; traced (mx.compile,
-            # mx.vmap) it cannot, and an out-of-range e instead makes the
-            # output NaN -- and, through the factor, every gradient.
             e = cast(ecc)
             ev = _scalar_value(e)
             if ev is not None:
                 _check_ecc(ev)
-            f = self._get_compiled(False, ew=True)(
-                t0_off, per, a, e, rad(params.w), ci, rp, *ld, fp)
-            if ev is None:
-                ok = mx.logical_and(e >= 0.0, e < 1.0)
-                f = f * mx.where(ok, 1.0, float("nan")).astype(dt)
-            return f
+                return "ew", e, rad(w), None
+            ok = mx.logical_and(e >= 0.0, e < 1.0)
+            return "ew", e, rad(w), mx.where(ok, 1.0, float("nan")).astype(
+                self.dtype)
         ev = float(ecc)
         _check_ecc(ev)
-        if ev == 0.0:                     # circular: w is irrelevant
-            b = (a * ci if is_arr(params.a) or is_arr(inc)
-                 else cast(float(params.a) * ci_py))
-            return self._get_compiled(True)(t0_off, per, a, b, rp, *ld, fp)
+        if ev == 0.0:
+            return ("circ",)
         sq = math.sqrt(ev)
-        if is_arr(params.w):
-            sw, cw = sincos(rad(params.w))
+        if is_arr(w):
+            sw, cw = sincos(rad(w))
             k, h = sq * cw, sq * sw
         else:
-            w = math.radians(float(params.w))
-            k, h = cast(sq * math.cos(w)), cast(sq * math.sin(w))
-        return self._get_compiled(False)(t0_off, per, a, k, h, ci, rp,
-                                         *ld, fp)
+            wr = math.radians(float(w))
+            k, h = cast(sq * math.cos(wr)), cast(sq * math.sin(wr))
+        return "kh", k, h, ev, sq
+
+    @staticmethod
+    def _apply_masks(f, *masks):
+        for m in masks:
+            if m is not None:
+                f = f * m
+        return f
 
     # -- oblate planets ------------------------------------------------------
     #
@@ -746,54 +836,32 @@ class TransitModel:
         return fn
 
     def _oblate_eval(self, params, uv, cast, rad, is_arr):
-        """light_curve / light_curve_mx for an oblate model; the parameter
-        handling of _model_eval (ecc routing and validation included), b
-        the impact parameter at conjunction from exposure.contact_geometry.
-        """
+        """light_curve / light_curve_mx for an oblate model: _model_eval's
+        parameter preparation and ecc routing, b the impact parameter at
+        conjunction from exposure.contact_geometry."""
         from .oblate import _check_domain
         _check_domain(params.rp, params.f)
-        dt = self.dtype
-        t0 = params.t0
-        if is_arr(t0):
-            with mx.stream(mx.cpu):
-                t0_off = (t0.astype(mx.float64) - self._t_ref).astype(dt)
-        else:
-            t0_off = cast(t0 - self._t_ref)
-        per, a, rp = cast(params.per), cast(params.a), cast(params.rp)
+        t0_off, per, a, rp, ci, ci_py, gmask = self._prep(params, cast, rad,
+                                                          is_arr)
         f = cast(params.f)
         th = rad(0.0 if params.theta is None else params.theta)
-        inc = params.inc
-        ci = (sincos(rad(inc))[1] if is_arr(inc)
-              else cast(math.cos(math.radians(float(inc)))))
-        tail = (self._t_mx, t0_off, per, a)
-        ecc, w = params.ecc, params.w
-        if is_arr(ecc):
-            # as _model_eval: (e, w) directly; validated when readable, NaN
-            # (output and gradients) when traced
-            e = cast(ecc)
-            ev = _scalar_value(e)
-            if ev is not None:
-                _check_ecc(ev)
-            wr = rad(w)
+        head = (self._t_mx, t0_off, per, a)
+        route = self._ecc_route(params, cast, rad, is_arr)
+        if route[0] == "ew":
+            _, e, wr, emask = route
             b = contact_geometry(a, e, e * sincos(wr)[0], ci)[1]
-            out = self._oblate_fn("ew")(*tail, b, rp, f, th, cast(uv), e, wr)
-            if ev is None:
-                ok = mx.logical_and(e >= 0.0, e < 1.0)
-                out = out * mx.where(ok, 1.0, float("nan")).astype(dt)
-            return out
-        ev = float(ecc)
-        _check_ecc(ev)
-        if ev == 0.0:
-            return self._oblate_fn("circ")(*tail, a * ci, rp, f, th, cast(uv))
-        sq = math.sqrt(ev)
-        if is_arr(w):
-            sw, cw = sincos(rad(w))
-            k, h = sq * cw, sq * sw
+            out = self._oblate_fn("ew")(*head, b, rp, f, th, cast(uv), e, wr)
+        elif route[0] == "circ":
+            emask = None
+            b = (a * ci if is_arr(params.a) or is_arr(params.inc)
+                 else cast(float(params.a) * ci_py))
+            out = self._oblate_fn("circ")(*head, b, rp, f, th, cast(uv))
         else:
-            wr = math.radians(float(w))
-            k, h = cast(sq * math.cos(wr)), cast(sq * math.sin(wr))
-        b = contact_geometry(a, cast(ev), h * sq, ci)[1]   # e sin w = h sqrt(e)
-        return self._oblate_fn("kh")(*tail, b, rp, f, th, cast(uv), k, h)
+            _, k, h, ev, sq = route
+            emask = None
+            b = contact_geometry(a, cast(ev), h * sq, ci)[1]   # e sin w = h sqrt(e)
+            out = self._oblate_fn("kh")(*head, b, rp, f, th, cast(uv), k, h)
+        return self._apply_masks(out, emask, gmask)
 
     def _check_shape_kind(self, params):
         """Oblate or spherical is fixed per model (separate graphs)."""
@@ -874,9 +942,14 @@ class TransitModel:
                 rows.append([float(x) for x in uv])
             u = np.array(rows, dtype=np.float64).reshape(len(seq), -1)
             _check_ecc(cols["ecc"])
+            _check_geometry_cols(cols)
             return cols, u
         p = params_seq                       # array-valued TransitParams
         u = self._check_law(p, sets=True)    # (1 or n_sets, N)
+        # the coefficient count, as the sequence path's _ld_coeffs checks it
+        # (a quadratic u of 3 entries was silently truncated, 1 entry gave
+        # an opaque IndexError); vector laws are counted by _check_law
+        _ld_coeffs(p, u=u[0])
         # any subset of the attributes may be arrays; the batch size is
         # the longest of them (scalars broadcast against it)
         sizes = set()
@@ -902,6 +975,7 @@ class TransitModel:
                              f"{u.shape[0]} sets, the other fields {n}")
         u = np.broadcast_to(u, (n, u.shape[1]))
         _check_ecc(cols["ecc"])
+        _check_geometry_cols(cols)
         return cols, np.ascontiguousarray(u)
 
     def light_curves(self, params_seq) -> np.ndarray:

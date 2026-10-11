@@ -27,6 +27,7 @@ from .hybrid import (HYBRID2, HYBRID2_EPS, HYBRID4,
                      HYBRID5, HybridLaw, LAWS as HYBRID_LAWS,
                      flux_dev_hybrid, hybrid_norms, shape_cols)
 from .oblate import flux_dev_oblate, shape_cols_oblate
+from .oblate_tau import contact_offsets_oblate
 from .ld import (hybrid2_from_q, hybrid2_from_q_np, hybrid2_to_q_np,
                  q_from_simplex_np, q_to_u, q_to_u_np, simplex_from_q,
                  simplex_from_q_np, u_to_q_np)
@@ -64,6 +65,7 @@ __all__ = [
     "HYBRID2_EPS",
     "flux_dev_oblate",
     "shape_cols_oblate",
+    "contact_offsets_oblate",
     "HYBRID4",
     "HYBRID5",
     "HYBRID_LAWS",
@@ -80,4 +82,4 @@ __all__ = [
     "sn_dev_with_aux",
 ]
 
-__version__ = "0.13.1"
+__version__ = "0.13.2"

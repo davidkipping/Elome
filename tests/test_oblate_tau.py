@@ -419,3 +419,29 @@ def test_theta_defaults_to_zero():
     a = flux(TAU, 0.3, 0.1, f=0.3)
     b = flux(TAU, 0.3, 0.1, f=0.3, theta=0.0)
     assert np.array_equal(a, b)
+
+
+def test_contact_offsets_oblate_takes_any_input():
+    """The public export follows the package's input conventions (0.13.1's
+    rejected Python floats, numpy, and fp64 arrays on the GPU stream)."""
+    ref = [float(np.asarray(c).ravel()[0]) for c in OT.contact_offsets_oblate(
+        *(mx.array([v], dtype=mx.float64) for v in (10.0, 0.3, 0.1, 0.2, 0.5)))]
+    for args in [(10.0, 0.3, 0.1, 0.2, 0.5),
+                 (np.array([10.0]), 0.3, np.array([0.1]), 0.2, 0.5)]:
+        got = mp.contact_offsets_oblate(*args)
+        assert got[0].dtype == mx.float64
+        with mx.stream(mx.cpu):
+            assert np.allclose([float(np.asarray(c).ravel()[0]) for c in got], ref,
+                               rtol=0, atol=1e-15)
+    with mx.stream(mx.gpu):
+        got = mp.contact_offsets_oblate(mx.array([10.0], dtype=mx.float64), 0.3, 0.1, 0.2, 0.5)
+    assert got[0].dtype == mx.float64
+    k, h = 0.3, 0.2
+    with mx.stream(mx.cpu):
+        ci = float(_ecc_shape(*(mx.array(v, dtype=mx.float64) for v in (10.0, 0.3, k, h)))[2])
+    a = mp.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=k, h=h)
+    b = mp.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=k, h=h, ci=ci)
+    with mx.stream(mx.cpu):
+        assert np.allclose([float(x) for x in a], [float(x) for x in b], rtol=0, atol=1e-15)
+    with pytest.raises(ValueError, match="both k and h"):
+        mp.contact_offsets_oblate(10.0, 0.3, 0.1, 0.2, 0.5, k=0.3)

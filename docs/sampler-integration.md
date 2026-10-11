@@ -260,19 +260,26 @@ one launch per step, analytic gradients in every input including `f` and
 `theta`, and `ld_basis=True` for collapsing the limb-darkening weights.
 What is specific to it:
 
-- **Cost.** One evaluation costs 16-37x a spherical hybrid one on the GPU,
-  and ~80x under the contact rule (whose spherical kernel is unusually
-  cheap per node); `benchmarks/bench_oblate.py`. Collapsing the
+- **Cost.** One evaluation costs tens of times a spherical hybrid one on
+  the GPU -- 16-37x in `benchmarks/bench_oblate.py`, about 50x for the
+  varied shapes of notebook 03 -- and ~80x under the contact rule (whose
+  spherical kernel is unusually cheap per node). Collapsing the
   limb-darkening weights (SquishierPlanet's path B, 10-100x in effective
   samples per second there) recovers more than that.
 - **Hybrid laws only.** The quadratic law raises with `f`. Prefer hybrid4
   or hybrid5: a quadratic-class law can fake a confident oblateness signal
   on a spherical planet.
 - **theta has period pi.** The ellipse is symmetric, so sample theta on
-  [0, pi) and wrap, or the posterior has two identical modes.
-- **The domain** is r <= (1 - f)^(3/2). Out of it an array argument gives
-  NaN (a sampler reads -inf), so a box prior on f must respect it at the
-  largest r the chains reach.
+  [0, pi) and wrap, or the posterior has two identical modes. On a
+  **central** transit there is a second symmetry: reflecting across the
+  chord maps theta to pi - theta, and at b = 0 the two light curves agree
+  to rounding (1e-16; 2e-5 apart at b = 0.05). So the wrapped posterior is
+  still bimodal there; fold theta onto [0, pi/2] for central transits.
+- **The domain** is r <= (1 - f)^(3/2). Out of it a Python number or a
+  numpy array raises `ValueError`, and an `mx.array` gives NaN -- neither
+  is -inf. Keep chains inside with the prior (a box on f must respect it
+  at the largest r the chains reach), or map a non-finite log-likelihood
+  to -inf in the wrapper (catching the `ValueError` for numpy inputs).
 - **Near f = 0** in float32 the model uses the spherical forms below
   f = 1e-5, so d/df is 0 in that band (the flux changes by < 4e-8 there).
   A chain started at f = 0 moves off it on the likelihood, not the

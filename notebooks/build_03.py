@@ -7,8 +7,11 @@ ordinary source in a diff. Every code cell is executed before the notebook
 is committed (it needs only metalplanet; matplotlib is optional); the
 committed copy has no outputs.
 """
-import json
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _nbwriter import write_notebook  # noqa: E402
 
 CELLS = []
 def md(text):   CELLS.append(("markdown", text.strip("\n")))
@@ -31,7 +34,7 @@ because they differ in what they can do and in what they cost:
 |---|---|---|
 | shape on the sky | disc, radius `rp` | ellipse: area-equivalent radius `rp`, flattening `f`, angle `theta` |
 | limb darkening | uniform, linear, quadratic, polynomial, hybrid2/4/5 | hybrid2/4/5 |
-| cost (fp32 GPU) | ~0.2 ns per point | ~15-50x more |
+| cost (fp32 GPU) | ~0.2 ns per point | tens of times more (B8) |
 | switch | leave `f` as `None` (the default) | set `f` |
 
 **Part A** walks through a spherical planet; **Part B** repeats the same
@@ -144,12 +147,14 @@ ph.limb_dark, ph.u = "hybrid5", list(w5)
 flux_h5 = mp.TransitModel(ph, t).light_curve(ph)
 print(f"hybrid5 depth = {(1 - flux_h5.min()) * 1e6:.0f} ppm")
 
-# the intensity profiles behind the two curves
-from metalplanet.hybrid import w_to_c
+# the intensity profiles behind the two curves: I/I(1) = 1 - sum_j w_j T_j(mu),
+# hybrid5's shape terms T = [1 - mu^4, (1 - mu^2)^2, Pi_eps for each pole] (README)
 mu = np.linspace(0, 1, 401)
-c, d = w_to_c("hybrid5", w5)
-I_h5 = c[0] + c[1] * mu**2 + c[2] * mu**4 + sum(dk / (mu**2 + ek)**2 for dk, ek in zip(d, mp.HYBRID5.eps))
-I_h5 = I_h5 / I_h5[-1]
+def pole_shape(mu, eps):
+    p_ = 1 + eps
+    return ((mu**2 + eps)**-2 - p_**-2) / (eps**-2 - p_**-2)
+T = [1 - mu**4, (1 - mu**2)**2] + [pole_shape(mu, e) for e in mp.HYBRID5.eps]
+I_h5 = 1 - sum(wj * Tj for wj, Tj in zip(w5, T))
 I_q = 1 - 0.40 * (1 - mu) - 0.25 * (1 - mu)**2
 
 if HAVE_PLT:
@@ -354,8 +359,8 @@ def residual(f, theta):
     q.f, q.theta = f, theta
     return (mp.TransitModel(q, t_hr).light_curve(q) - flux_sph) * 1e6
 
-for theta in (0.0, 30.0, 60.0, 90.0):
-    r_ = residual(0.1, theta)
+res_theta = {theta: residual(0.1, theta) for theta in (0.0, 30.0, 60.0, 90.0)}
+for theta, r_ in res_theta.items():
     asym = np.abs(r_ - r_[::-1]).max() / 2
     print(f"f = 0.1, theta = {theta:4.0f} deg: peak |residual| {np.abs(r_).max():5.1f} ppm, "
           f"time-asymmetric part {asym:5.1f} ppm")
@@ -364,8 +369,8 @@ for f in (0.02, 0.05, 0.1, 0.2):
 
 if HAVE_PLT:
     plt.figure(figsize=(7, 3))
-    for theta in (0.0, 30.0, 60.0, 90.0):
-        plt.plot(t_hr * 24, residual(0.1, theta), label=f"theta = {theta:.0f}")
+    for theta, r_ in res_theta.items():
+        plt.plot(t_hr * 24, r_, label=f"theta = {theta:.0f}")
     plt.xlabel("time from mid-transit [h]"); plt.ylabel("oblate - spherical [ppm]")
     plt.legend(); plt.title("f = 0.1"); plt.show()
 """)
@@ -374,8 +379,11 @@ md("""
 ## B4. `f -> 0` is the spherical planet
 
 At `f = 0` the oblate model equals the spherical one to rounding, and for
-small `f` it departs smoothly -- there is no discontinuity to trip a
-sampler that starts from a round planet.
+small `f` it departs smoothly and linearly (in float64, checked below).
+One caveat for float32: below `f = 1e-5` the GPU kernels use the spherical
+forms -- the flattening changes the flux by under 4e-8 there -- so the
+gradient in `f` is exactly 0 in that band. A float32 sampler should start
+`f` at a small positive value (1e-4 is plenty), not at 0.
 """)
 
 code("""
@@ -391,24 +399,23 @@ A tilted ellipse does not touch the limb at the same distance on the way in
 as on the way out, so its four contact times are **not symmetric** about
 mid-transit, and they differ from a sphere's. MetalPlanet solves them per
 side; the contact rule then splits each exposure at the oblate planet's own
-kinks. `oblate_tau.contact_offsets_oblate` exposes them (as orbital phase).
+kinks. `mp.contact_offsets_oblate` exposes them (as orbital phase).
 """)
 
 code("""
-from metalplanet.oblate_tau import contact_offsets_oblate
-from metalplanet.exposure import contact_offsets
+to_min = 3.456 / (2 * math.pi) * 24 * 60          # orbital phase -> minutes
+b_ = 8.8 * math.cos(math.radians(87.0))
 
-def as_arr(*v):
-    return [mx.array([x], dtype=mx.float64) for x in v]
-
+# the oblate planet's contacts, per side (per-chain arrays in, phases out)
 with mx.stream(mx.cpu):
-    b_ = 8.8 * math.cos(math.radians(87.0))
-    c_obl = contact_offsets_oblate(*as_arr(8.8, b_, 0.1, 0.1, math.radians(30.0)))
-    c_sph = contact_offsets(*as_arr(0.1, 8.8, b_))
-    to_min = 3.456 / (2 * math.pi) * 24 * 60
-    for name, c in (("oblate f=0.1, 30 deg", c_obl), ("sphere, same area", c_sph)):
-        mins = [float(np.asarray(x)[0]) * to_min for x in c]
-        print(f"{name:22s} contacts [min from mid-transit]: " + "  ".join(f"{v:+8.3f}" for v in mins))
+    arr = lambda v: mx.array([v], dtype=mx.float64)
+    c_obl = mp.contact_offsets_oblate(arr(8.8), arr(b_), arr(0.1), arr(0.1), arr(math.radians(30.0)))
+    c_obl = [float(np.asarray(c)[0]) * to_min for c in c_obl]
+# a sphere's, in closed form: sin^2(phi) = ((1 +- r)^2 - b^2) / (a^2 - b^2)
+phi = [math.asin(math.sqrt(((1 + s_ * 0.1)**2 - b_**2) / (8.8**2 - b_**2))) for s_ in (1, -1)]
+c_sph = [-phi[0] * to_min, -phi[1] * to_min, phi[1] * to_min, phi[0] * to_min]
+for name, c in (("oblate f=0.1, 30 deg", c_obl), ("sphere, same area", c_sph)):
+    print(f"{name:22s} contacts [min from mid-transit]: " + "  ".join(f"{v:+8.3f}" for v in c))
 
 ref = mp.TransitModel(po, tc, supersample_factor=401, exp_time=EXP).light_curve(po)
 for label, kw in [("supersample x 7", dict(supersample_factor=7, exp_time=EXP)),
@@ -420,17 +427,24 @@ for label, kw in [("supersample x 7", dict(supersample_factor=7, exp_time=EXP)),
 md("""
 ## B6. Eccentric orbits
 
-Nothing changes: set `ecc` and `w` as for a spherical planet. `b` is still
-the impact parameter at conjunction, so the transit keeps its chord while
-the orbit changes the speed across the star.
+Nothing changes: set `ecc` and `w` as for a spherical planet. On
+`TransitParams` the orbit is fixed by `inc`, so with `inc` held the impact
+parameter at conjunction, $b = a \cos i\,(1-e^2)/(1+e\sin\omega)$, moves
+with the eccentricity. Below, `inc` is chosen to keep `b` -- the chord --
+the same, so what changes is only the speed across the star: the same
+depth, a shorter transit.
 """)
 
 code("""
+e_, w_ = 0.3, 40.0
+cosi = b_ * (1 + e_ * math.sin(math.radians(w_))) / (8.8 * (1 - e_**2))   # same b as circular
 pe = copy.copy(po)
-pe.ecc, pe.w = 0.3, 40.0
+pe.ecc, pe.w, pe.inc = e_, w_, math.degrees(math.acos(cosi))
 flux_ecc = mp.TransitModel(pe, t_hr).light_curve(pe)
-print(f"e = 0.3 transit: depth {(1 - flux_ecc.min()) * 1e6:.0f} ppm, "
-      f"points in transit {int((flux_ecc < 1).sum())} vs {int((flux_obl < 1).sum())} circular")
+dt_hr = (t_hr[1] - t_hr[0]) * 24
+print(f"b at conjunction: {b_:.3f} (both orbits)")
+print(f"depth: e = 0.3 {(1 - flux_ecc.min()) * 1e6:.0f} ppm, circular {(1 - flux_obl.min()) * 1e6:.0f} ppm")
+print(f"duration: e = 0.3 {(flux_ecc < 1).sum() * dt_hr:.2f} h, circular {(flux_obl < 1).sum() * dt_hr:.2f} h")
 """)
 
 md("""
@@ -501,9 +515,11 @@ print(f"flux_dev_from_tau on the GPU: spherical {k_s:.2f} ms ({k_s * 1e6 / npts:
 """)
 
 md("""
-The ratio depends on the exposure rule: with the contact rule each point
-costs 25 evaluations, and the spherical kernel is so cheap per evaluation
-that the oblate one is ~80x it there. In absolute terms an oblate planet
+The ratio depends on the law, the shapes and how much of the grid is in
+transit: 16-37x in `benchmarks/bench_oblate.py`'s production shape, about
+50x for the sets above. With the contact rule each point costs 25
+evaluations, and the spherical kernel is so cheap per evaluation that the
+oblate one is ~80x it there. In absolute terms an oblate planet
 on the GPU is still far faster than the CPU codes for oblate planets -- see
 `benchmarks/oblate_compare/RESULTS.md` (squishyplanet, JoJo, GreenLantern).
 """)
@@ -545,10 +561,15 @@ md(r"""
   found that a crude law (quadratic-class) *fakes* a confident oblateness
   signal on a spherical planet.
 * **The domain** is $r_p \le (1-f)^{3/2}$ (0.35 at f = 0.5): there the planet
-  crosses the limb at most twice. Outside it a Python value raises and an
-  `mx.array` gives NaN (so a sampler sees -inf).
-* **`theta` has period 180 deg.** Sample it on [0, 180) and wrap, or a
-  sampler sees two identical modes.
+  crosses the limb at most twice. Outside it a Python number or a numpy
+  array **raises**, and an `mx.array` gives **NaN**. Neither is -inf: keep
+  chains inside with the prior, or map a non-finite log-likelihood to -inf
+  in your sampler's wrapper.
+* **`theta` has period 180 deg.** Sample it on [0, 180) and wrap. On a
+  **central** transit there is a second symmetry: reflecting across the
+  chord maps `theta` to `180 - theta`, and at b = 0 the two light curves are
+  identical, so even the wrapped posterior has two exact modes (and nearly
+  so for small b). Fold `theta` onto [0, 90] there, or expect bimodality.
 * **f and theta are degenerate on central transits.** With b near 0 an
   aligned oblate planet and a smaller-b round one can look alike; that is a
   sampling problem (priors, parameterisation), not a model one.
@@ -579,7 +600,7 @@ md("""
 | float64 accuracy | ~1e-15 | ~1e-15 (vs SquishierPlanet and a 30-digit integral) |
 | float32 (GPU) accuracy | ~1e-7 | ~1e-7 |
 | exposures, eccentric orbits, gradients, batching, `ld_basis` | yes | yes |
-| cost (fp32 GPU) | ~0.2 ns per point | ~15-50x that; ~80x under the contact rule |
+| cost (fp32 GPU) | ~0.2 ns per point | tens of times that (16-37x in `benchmarks/bench_oblate.py`; B8 measures this notebook's case); ~80x under the contact rule |
 
 ## Where to go next
 
@@ -591,22 +612,4 @@ md("""
 * Notebook 01 -- fitting a transit with anvil's HMC.
 """)
 
-nb = {"cells": [], "metadata": {
-        "kernelspec": {"display_name": "Python 3", "language": "python",
-                       "name": "python3"},
-        "language_info": {"name": "python", "version": "3.11"}},
-      "nbformat": 4, "nbformat_minor": 5}
-for kind, text in CELLS:
-    lines = text.split("\n")
-    src = [l + "\n" for l in lines[:-1]] + [lines[-1]]
-    cell = {"cell_type": kind, "id": f"cell-{len(nb['cells']):02d}",
-            "metadata": {}, "source": src}
-    if kind == "code":
-        cell["outputs"] = []
-        cell["execution_count"] = None
-    nb["cells"].append(cell)
-with open(sys.argv[1], "w") as f:
-    json.dump(nb, f, indent=1)
-    f.write("\n")
-print(f"wrote {sys.argv[1]}: {len(CELLS)} cells "
-      f"({sum(1 for k, _ in CELLS if k == 'code')} code)")
+write_notebook(CELLS, sys.argv[1])

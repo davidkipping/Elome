@@ -212,3 +212,70 @@ class TestEccentricKernelRouting:
         m = metalplanet.TransitModel(p, np.linspace(-0.35, 0.35, 101),
                                      dtype=mx.float32, use_metal=False)
         assert not m._kernel_usable()
+
+
+# ---------------------------------------------------------------------------
+# v0.13.2 production review
+# ---------------------------------------------------------------------------
+
+def _mp(**kw):
+    return _params(**kw)[0]
+
+@pytest.mark.parametrize("bad", [dict(rp=-0.1), dict(rp=float("nan")),
+                                 dict(a=0.5), dict(per=-3.0)])
+def test_invalid_geometry_raises(bad):
+    t = np.linspace(-0.1, 0.1, 51)
+    m = metalplanet.TransitModel(_mp(), t)
+    with pytest.raises(ValueError, match="must be"):
+        m.light_curve(_mp(**bad))
+    p = _mp()
+    for k, v in bad.items():
+        setattr(p, k, np.array([0.11 if k == "rp" else getattr(p, k), v]))
+    with pytest.raises(ValueError, match="must be"):
+        m.light_curves(p)
+
+
+def test_invalid_traced_geometry_is_nan():
+    t = np.linspace(-0.1, 0.1, 51)
+    with mx.stream(mx.cpu):
+        m = metalplanet.TransitModel(_mp(), t)
+        comp = mx.compile(lambda r: m.light_curve_mx(_mp(rp=r)))
+        assert np.isnan(np.asarray(comp(mx.array(-0.1, dtype=mx.float64)))).all()
+        assert np.isfinite(np.asarray(comp(mx.array(0.11, dtype=mx.float64)))).all()
+
+
+@pytest.mark.parametrize("u", [[0.3, 0.2, 0.5], [0.3]])
+def test_array_valued_light_curves_check_the_coefficient_count(u):
+    m = metalplanet.TransitModel(_mp(), np.linspace(-0.1, 0.1, 51))
+    p = _mp()
+    p.rp = np.array([0.1, 0.11])
+    p.u = u
+    with pytest.raises(ValueError, match="takes 2 coefficients"):
+        m.light_curves(p)
+
+
+def test_use_metal_false_gradients_finite_at_r1_z0():
+    """The non-Metal fallback is the analytic core: flux_dev's reverse mode
+    is NaN at r = 1, z = 0 (a white-dwarf occultor at mid-eclipse)."""
+    p = _mp(t0=0.0, rp=1.0, inc=90.0, ecc=0.0)
+    t = np.linspace(-0.01, 0.01, 21)
+    for use_metal in (True, False):
+        with mx.stream(mx.cpu):
+            m = metalplanet.TransitModel(p, t, use_metal=use_metal)
+
+            def loss(r):
+                q = _mp(t0=0.0, rp=r, inc=90.0, ecc=0.0)
+                return mx.sum(m.light_curve_mx(q))
+            g = mx.grad(loss)(mx.array(1.0, dtype=mx.float64))
+        assert np.isfinite(float(g)), use_metal
+
+
+def test_failed_metal_probe_warns_and_can_reprobe(monkeypatch):
+    from metalplanet import metal as M
+    def boom():
+        raise RuntimeError("simulated compile failure")
+    monkeypatch.setattr(M, "_get_kernels", boom)
+    with pytest.warns(RuntimeWarning, match="simulated compile failure"):
+        assert M.metal_available(reprobe=True) is False
+    monkeypatch.undo()
+    assert M.metal_available(reprobe=True) == metal_available()

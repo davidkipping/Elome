@@ -157,17 +157,62 @@ def _newton_contact(phi, a, b, ecc, A, B, cth, sth, kind, side, lim, n):
     return phi, g
 
 
-def contact_offsets_oblate(a, b, r, f, theta, k=None, h=None, ci=None,
-                           consts=None):
+def contact_offsets_oblate(a, b, r, f, theta, k=None, h=None, ci=None):
     """The four contact phases (ingress outer, ingress inner, egress inner,
-    egress outer) of an oblate planet, as offsets from mid-transit
-    (phi = 2 pi (t - t0) / P), per chain and detached; ordered.
+    egress outer) of an oblate planet, as offsets from mid-transit in
+    orbital phase (phi = 2 pi (t - t0) / P); ordered, detached.
 
-    a, b, r, f, theta: (n,) arrays of one dtype. Give (k, h, ci) for the
-    transit-anchored eccentric orbit (``consts``, if given, replaces
-    anchor_constants(k, h) -- the (e, w) route). A missing contact collapses
-    onto a point inside the transit (the inner pair of a graze), or all four
-    onto one point (no transit)."""
+    a: a/R*; b: impact parameter at conjunction; r: area-equivalent radius;
+    f: flattening; theta: the long axis's sky angle [rad]; (k, h) =
+    (secosw, sesinw) for the transit-anchored eccentric orbit, with ci =
+    cos i (derived from (a, b, k, h) if omitted). Each argument a Python
+    number, a numpy array or an mx.array, broadcast together; the result
+    has their broadcast shape. Computed in float64 (on the CPU stream)
+    unless every array argument is float32. A missing contact collapses
+    onto a point inside the transit (the inner pair of a graze), or all
+    four onto one point (no transit).
+    """
+    if (k is None) != (h is None):
+        raise ValueError("pass both k and h (secosw, sesinw), or neither")
+    vals = [a, b, r, f, theta] + ([k, h] if k is not None else []) \
+        + ([ci] if ci is not None else [])
+    arrays = [v for v in vals if isinstance(v, mx.array)]
+    dt = (mx.float32 if arrays and all(v.dtype == mx.float32 for v in arrays)
+          else mx.float64)
+    shape = np.broadcast_shapes(*(tuple(v.shape) if isinstance(v, mx.array)
+                                  else np.shape(v) for v in vals))
+    n = int(np.prod(shape)) if shape else 1
+
+    def norm(v):
+        with mx.stream(mx.cpu):
+            x = (v.astype(dt) if isinstance(v, mx.array)
+                 else mx.array(np.asarray(v, dtype=np.float64), dtype=dt))
+            return mx.reshape(mx.broadcast_to(x, shape), (n,))
+
+    ctx = mx.stream(mx.cpu) if dt == mx.float64 else _nullctx()
+    with ctx:
+        a, b, r, f, theta = (norm(v) for v in (a, b, r, f, theta))
+        if k is not None:
+            k, h = norm(k), norm(h)
+            ci = M._ecc_shape(a, b, k, h)[2] if ci is None else norm(ci)
+        out = _contact_offsets_oblate(a, b, r, f, theta, k, h, ci)
+        return tuple(mx.reshape(c, shape) for c in out)
+
+
+class _nullctx:
+    def __enter__(self):
+        return None
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _contact_offsets_oblate(a, b, r, f, theta, k=None, h=None, ci=None,
+                            consts=None):
+    """contact_offsets_oblate's work, on canonical inputs: (n,) mx arrays
+    of one dtype on the active stream (the graph, oblate kernels and tests
+    call it directly). ``consts``, if given, replaces anchor_constants(k, h)
+    -- the (e, w) route."""
     from .exposure import contact_offsets, contact_offsets_anchored
     a, b, r, f, theta = (mx.stop_gradient(v) for v in (a, b, r, f, theta))
     dt = a.dtype
@@ -215,13 +260,12 @@ def _orbit_consts(a, b, k, h, ew=False):
     from (k, h) holding (e, w [rad]) themselves (anchor_constants_ew):
     exact in d/de at e = 0, where the (k, h) map is singular (TransitModel's
     array-ecc route). cos i is metal._ecc_shape's, written in (e, e sin w)."""
-    from .anchored import anchor_constants, anchor_constants_ew
+    from .anchored import anchor_constants, anchor_constants_ew, cos_inc_from_b
     if not ew:
         return M._ecc_shape(a, b, k, h)[2], anchor_constants(k, h)
     e, w = k, h
     esw = e * sincos(w)[0]
-    ci = b * (1.0 + esw) / (a * mx.maximum(1.0 - e * e,
-                                           1.0 - M._E_MAX * M._E_MAX))
+    ci = cos_inc_from_b(a, b, e, esw, M._E_MAX)
     return ci, anchor_constants_ew(e, w)
 
 
@@ -279,10 +323,10 @@ def _tau_graph(tau, period, a, b, r, f, theta, w2d, exp_time, mode, n_gl,
         if ecc:
             ci, consts = _orbit_consts(a, b, k, h, ew)
             kc, hc = _contact_kh(k, h, ew)
-            cs = contact_offsets_oblate(a, b, r, f, theta, kc, hc, ci,
-                                        consts=consts)
+            cs = _contact_offsets_oblate(a, b, r, f, theta, kc, hc, ci,
+                                         consts=consts)
         else:
-            cs = contact_offsets_oblate(a, b, r, f, theta)
+            cs = _contact_offsets_oblate(a, b, r, f, theta)
         cs = tuple(mx.reshape(c, (-1, 1)) for c in cs)
         T, W = exposure_nodes(tau, tau * 0.0, mx.stop_gradient(per1),
                               exp_time, cs, int(n_gl), dtype=tau.dtype)

@@ -11,7 +11,11 @@ The authoritative non-tutorial version of this fit, including the
 cross-sampler agreement check, is anvil-gp's
 examples/hotjupiter_gp_joint.py.
 """
-import json, sys
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _nbwriter import write_notebook  # noqa: E402
 
 CELLS = []
 def md(text):   CELLS.append(("markdown", text.strip("\n")))
@@ -439,21 +443,4 @@ than silently falling back.
 * `docs/sampler-integration.md` — batching, conditioning and the eccentric
   constraint barrier in depth.
 """)
-nb = {"cells": [], "metadata": {
-        "kernelspec": {"display_name": "Python 3", "language": "python",
-                       "name": "python3"},
-        "language_info": {"name": "python", "version": "3.11"}},
-      "nbformat": 4, "nbformat_minor": 5}
-for kind, text in CELLS:
-    lines = text.split("\n")
-    src = [l + "\n" for l in lines[:-1]] + [lines[-1]]
-    cell = {"cell_type": kind, "metadata": {}, "source": src}
-    if kind == "code":
-        cell["outputs"] = []
-        cell["execution_count"] = None
-    nb["cells"].append(cell)
-with open(sys.argv[1], "w") as f:
-    json.dump(nb, f, indent=1)
-    f.write("\n")
-print(f"wrote {sys.argv[1]}: {len(CELLS)} cells "
-      f"({sum(1 for k,_ in CELLS if k=='code')} code)")
+write_notebook(CELLS, sys.argv[1])

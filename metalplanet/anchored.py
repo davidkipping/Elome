@@ -216,6 +216,14 @@ def _solve_delta_vjp(primals, cotangents, outputs):
             _unbroadcast(gD * sind, shapes[2]))
 
 
+def cos_inc_from_b(a, b, e, esw, e_max: float):
+    """cos i from the impact parameter at inferior conjunction,
+    b = a cos i (1 - e^2) / (1 + e sin w), with 1 - e^2 floored at
+    1 - e_max^2. The one copy: the tau kernels' plug-in (metal._ecc_shape),
+    anvil's eccentric model and the oblate orbit all call it."""
+    return b * (1.0 + esw) / (a * mx.maximum(1.0 - e * e, 1.0 - e_max * e_max))
+
+
 def separation_anchored(phi, k, h, a, ci, eps: float = 1.1920929e-07,
                         consts=None):
     """(z, front) for an eccentric orbit, anchored at inferior conjunction.

@@ -49,14 +49,29 @@ def import_engine():
     """Import the sampling engine under either of its names.
 
     Returns (engine_module, ChunkedGaussianLogLike). Tries ``anvil``
-    first (the engine's new name), then ``applemcmc``.
+    first (the engine's new name), then ``applemcmc`` -- but only when no
+    ``anvil`` is installed at all: an ``anvil`` that is present and fails
+    to import (a missing dependency of its own, or an unrelated package
+    of the same name) re-raises that error instead of a misleading
+    "No module named 'applemcmc'".
     """
+    import importlib.util
+    if importlib.util.find_spec("anvil") is not None:
+        try:
+            import anvil as engine
+            from anvil.precision import ChunkedGaussianLogLike
+        except ImportError as err:
+            raise ImportError(
+                "an 'anvil' package is installed but is not the anvil MCMC "
+                f"engine, or failed to import: {err}") from err
+        return engine, ChunkedGaussianLogLike
     try:
-        import anvil as engine
-        from anvil.precision import ChunkedGaussianLogLike
-    except ImportError:
         import applemcmc as engine
         from applemcmc.precision import ChunkedGaussianLogLike
+    except ImportError as err:
+        raise ImportError(
+            "the anvil MCMC engine is not installed (looked for 'anvil' and "
+            "its former name 'applemcmc')") from err
     return engine, ChunkedGaussianLogLike
 
 
@@ -71,7 +86,8 @@ def make_quad_transit_flux(period_ref: float, analytic_vjp: bool = True,
                    falling back to "analytic" for fp64/CPU/unsupported
                    machines (the default; anvil's fp64 verification path
                    and CPU data generation ride the fallback);
-      "analytic" — MLX graph forward + ALFM19 closed-form backward;
+      "analytic" — MLX graph forward + ALFM19 closed-form backward
+                   ("graph" is an alias, as for make_ecc_transit_flux);
       "autodiff" — pure reverse-mode autodiff (Stage 1 oracle).
     analytic_vjp=False is a back-compat alias for core="autodiff"."""
     period_ref = float(period_ref)
@@ -106,7 +122,7 @@ def make_quad_transit_flux(period_ref: float, analytic_vjp: bool = True,
             return graph_fn(v, x)
 
         return flux_dev_fn
-    elif core == "analytic":
+    elif core in ("analytic", "graph"):
         from .vjp import flux_dev_analytic as core_fn
     elif core == "autodiff":
         core_fn = flux_dev
@@ -282,6 +298,10 @@ def make_transit_target(t, y, yerr, t0_guess, period_guess,
                         core: str = "metal", strength: float = 1e6):
     """Build an anvil fitting problem from REAL photometry.
 
+    ``core`` is "metal" (default: fused fp32 kernels, falling back to the
+    analytic graph off the GPU), "analytic" (alias "graph") or "autodiff",
+    for circular and eccentric models alike.
+
     This is the entry point for mission data (Kepler, TESS, ...). It owns
     the conditioning that the float32 sampling path depends on, so a
     caller never has to rediscover it:
@@ -408,7 +428,8 @@ def _ecc_orbit_from_v(v, e_max: float = E_MAX_NUMERICAL):
     esw = h * sq                                   # e sin w, division-free
     b, a = v[:, 3], v[:, 4]
     # b = (a cos i) (1 - e^2) / (1 + e sin w)  =>  cos i = b (1 + e sin w) / (a (1 - e^2))
-    ci = b * (1.0 + esw) / (a * mx.maximum(1.0 - e * e, 1.0 - e_max * e_max))
+    from .anchored import cos_inc_from_b
+    ci = cos_inc_from_b(a, b, e, esw, e_max)
     return k, h, ci, e
 
 
@@ -453,10 +474,11 @@ def ecc_constraint_penalty(v, strength: float = 1e6,
     k, h, ci, e = _ecc_orbit_from_v(v, e_max)
     r, a, b = v[:, 2], v[:, 4], v[:, 3]
     e_raw = v[:, 7] ** 2 + v[:, 8] ** 2
-    sq = mx.sqrt(mx.maximum(e, 1e-30))
-    esw = mx.where(e_raw > e_max,
-                   v[:, 8] * mx.sqrt(mx.maximum(e_max / mx.maximum(
-                       e_raw, 1e-30), 0.0)) * sq, v[:, 8] * sq)
+    # e sin w of the PROJECTED orbit, as _ecc_orbit_from_v forms it (its
+    # masked denominator is safe; re-deriving it here through
+    # sqrt(e_max / max(e_raw, 1e-30)) gave NaN gradients in fp32 at e = 0,
+    # the unused branch's backward squaring 1e-30 to 0)
+    esw = h * mx.sqrt(mx.maximum(e, 1e-30))
     # each residual is DIMENSIONLESS and O(1): |cos i| - 1 would instead
     # explode, because projecting onto the e_max disc drives 1 - e^2 to
     # 0.002 and cos i with it, contributing ~1e12 with ~1e11 gradients.
@@ -479,11 +501,15 @@ def make_ecc_transit_flux(period_ref: float, core: str = "metal"):
     circular model does.
     """
     period_ref = float(period_ref)
-    graph_fn = _build_graph_ecc_model(period_ref)
-    if core == "graph":
-        return graph_fn
+    if core not in ("metal", "analytic", "graph", "autodiff"):
+        raise ValueError(f"unknown core {core!r}; choose 'metal', "
+                         "'analytic' (alias 'graph') or 'autodiff'")
+    # the graph's photometric core: analytic backward (finite at every
+    # contact, r = 1 included) unless the autodiff oracle is asked for
+    graph_fn = _build_graph_ecc_model(period_ref,
+                                      autodiff=core == "autodiff")
     if core != "metal":
-        raise ValueError(f"unknown core {core!r}")
+        return graph_fn
     from .metal import _gpu_stream_active, make_model_core_metal, metal_available
     if not metal_available():
         return graph_fn
@@ -504,9 +530,13 @@ def make_ecc_transit_flux(period_ref: float, core: str = "metal"):
     return flux_dev_fn
 
 
-def _build_graph_ecc_model(period_ref: float):
-    """Same math in pure MLX graph ops: the fp64 / CPU verification path."""
+def _build_graph_ecc_model(period_ref: float, autodiff: bool = False):
+    """Same math in pure MLX graph ops: the fp64 / CPU verification path.
+    The photometry is flux_dev_analytic (closed-form backward) unless
+    ``autodiff``: flux_dev's reverse mode is NaN at r = 1, z = 0."""
     from .anchored import separation_anchored
+    from .vjp import flux_dev_analytic
+    phot = flux_dev if autodiff else flux_dev_analytic
 
     def flux_dev_fn(v: mx.array, x: mx.array) -> mx.array:
         dt, kk = x[0], x[1]
@@ -520,7 +550,7 @@ def _build_graph_ecc_model(period_ref: float):
         phi = (2.0 * np.pi) * tau / period
         z, front = separation_anchored(phi, k[:, None], h[:, None], a,
                                        ci[:, None])
-        f = flux_dev(z, r, u1, u2)
+        f = phot(z, r, u1, u2)
         return df0 + mx.where(front & (z < 1.0 + r), f, 0.0)
 
     return flux_dev_fn
@@ -542,7 +572,10 @@ class PenalizedLogLike:
         return self.base(v) + self.penalty(v)
 
     def hi(self, v: mx.array) -> mx.array:
-        return self.base.hi(v) + self.penalty(v.astype(mx.float64))
+        # fp64 lives on the CPU (MLX has no fp64 on Metal); the base's hi
+        # switches stream itself, the penalty must too
+        with mx.stream(mx.cpu):
+            return self.base.hi(v) + self.penalty(v.astype(mx.float64))
 
     def __getattr__(self, name):
         # __getattr__ runs for ANY attribute missing from the instance,
