@@ -1,6 +1,6 @@
 """flux_dev_from_tau against the route it replaces.
 
-The route turin uses today builds the sub-exposure axis as an MLX array:
+The route it replaces builds the sub-exposure axis as an MLX array:
 
     tau  (n, m * n_sub)  ->  separation_circular  ->  flux_dev_metal
                          ->  reshape + mean over the sub-exposure axis
@@ -40,7 +40,7 @@ def make_inputs(n, m):
 
 
 def route_expanded(tau, pars, n_sub):
-    """What turin does today: expand the sub-exposure axis into MLX."""
+    """The replaced route: expand the sub-exposure axis into MLX."""
     per, a, b, r, u1, u2 = [p[:, None] for p in pars]
     off = mx.array(np.linspace(-0.5 * EXP, 0.5 * EXP, n_sub, dtype=np.float32))
     n, m = tau.shape

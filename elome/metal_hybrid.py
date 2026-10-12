@@ -421,8 +421,8 @@ def _law_tag(law):
     """Metal kernel-name fragment, always a valid identifier piece. A
     registered definition whose name is already one (hybrid2/4/5) keeps
     that name, so its kernels are unchanged; anything else -- an unregistered
-    definition, or a registered name like "my-law" (which aborted the
-    process in 0.12.1) -- gets the sanitised name plus a digest of the
+    definition, or a registered name like "my-law" (which is not a valid
+    Metal identifier) -- gets the sanitised name plus a digest of the
     definition, so it never collides. Every distinct definition compiles
     its own kernels, kept for the life of the process."""
     from .hybrid import LAWS
@@ -607,7 +607,7 @@ def _canon_w(u, n, n_w, dtype, name):
     w = u if isinstance(u, mx.array) else mx.array(
         np.asarray(u, dtype=np.float64), dtype=dtype)
     # before any GPU op on it: an fp64 array cannot even be broadcast
-    # there (0.10.5 cast last, after the broadcast, and so raised)
+    # there (casting after the broadcast would raise)
     w = M._as_dtype(w, dtype)
     if w.ndim == 1:
         if w.shape[0] != n_w:
@@ -811,6 +811,6 @@ def flux_dev_metal_hybrid(z, r, law, u, basis=False):
     else:
         # hybrid.py's graph itself, so every route to this function --
         # fp64, the CPU stream, a Metal-less machine -- is one expression,
-        # bitwise (0.10.3's dot-product contraction was 2.4e-7 apart)
+        # bitwise (a separate dot-product contraction would be 2.4e-7 apart)
         out = flux_dev_hybrid(z2d, rc[:, None], w2d, law)
     return out[0] if squeeze and n == 1 else out

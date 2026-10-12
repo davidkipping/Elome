@@ -126,7 +126,7 @@ class TestSolver:
 
 class TestConditioning:
     """The reason this module exists: float32 gradients w.r.t. (k, h)
-    must not degrade as e -> 0 (benchmarks/v3_kh_grad_conditioning.py
+    must not degrade as e -> 0 (benchmarks/kh_grad_conditioning.py
     measures the direct path at 5% relative error at e = 1e-5)."""
 
     @staticmethod

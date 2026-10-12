@@ -35,8 +35,8 @@ def epoch_center_times(
 
     dt = t - t0_ref - k * period_ref with k = round((t - t0_ref)/period_ref):
     each datum's time relative to its own transit, plus which orbit it
-    belongs to (exact small integers). Same contract as the applemcmc
-    trapezoid example.
+    belongs to (exact small integers): the (2, m) data contract of the
+    anvil model functions.
     """
     t_model = np.asarray(t_model, dtype=np.float64)
     k = np.round((t_model - t0_ref) / period_ref)
@@ -60,10 +60,9 @@ def separation_circular(tau: mx.array, period, b, a) -> mx.array:
     conjunction (z = b at phase 0.5). Points with cos phi <= 0 (planet
     behind the star) are pushed to z + 2a >= 2a > 1 + r -- any orbit that
     keeps the two bodies apart has a > 1 + r -- where the flux and its
-    gradients are identically zero/flat, for any r. (Before 0.11.0 the
-    push was 2 + z, which clears the star only for r <= 1: an occultor
-    larger than the star with b < r - 1 got a fake eclipse at the far
-    conjunction.)
+    gradients are identically zero/flat, for any r. (A push of 2 + z
+    would clear the star only for r <= 1: an occultor larger than the star
+    with b < r - 1 would get a fake eclipse at the far conjunction.)
 
     The sqrt argument is floored so the backward pass stays finite at the
     exact point z = 0 (b = 0 at mid-transit); the floor changes z by

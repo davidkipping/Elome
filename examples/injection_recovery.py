@@ -1,13 +1,13 @@
 """End-to-end injection-recovery: synthetic Kepler-like light curve
 (absolute BJD times ~2.457e6 d), fit with ChEES-HMC and the stretch move.
 
-Acceptance criteria (the ones the trapezoid could not meet):
+Acceptance criteria:
   * ChEES-HMC runs with ZERO divergences on this smooth model,
   * truth recovered within uncertainties by both samplers,
   * ESS/s comparison — on a smooth model HMC should win per-draw
     efficiency decisively.
 
-Run:  .venv/bin/python elome/examples/injection_recovery.py
+Run:  python examples/injection_recovery.py
 """
 
 import time
@@ -16,8 +16,8 @@ import mlx.core as mx
 import numpy as np
 
 from elome.anvil import import_engine
-applemcmc, _ = import_engine()
-diagnostics = applemcmc.diagnostics
+engine, _ = import_engine()
+diagnostics = engine.diagnostics
 ess_bulk, split_rhat, summary = (diagnostics.ess_bulk, diagnostics.split_rhat, diagnostics.summary)
 from elome.anvil import PARAM_NAMES, make_target
 
@@ -29,15 +29,15 @@ rng = np.random.default_rng(0)
 u0 = mx.array(
     (u_truth + 1e-3 * rng.standard_normal((N_CHAINS, 8))).astype(np.float32))
 
-print(applemcmc.validate_precision(tt.target, u0[:32]), "\n", flush=True)
+print(engine.validate_precision(tt.target, u0[:32]), "\n", flush=True)
 
 results = {}
 for label, kernel, n_warmup, n_samples, thin in (
-    ("stretch", applemcmc.EnsembleKernel(tt.target, seed=0), 1500, 400, 2),
-    ("ChEES-HMC", applemcmc.ChEESHMC(tt.target, max_leapfrog=128), 300, 150, 1),
+    ("stretch", engine.EnsembleKernel(tt.target, seed=0), 1500, 400, 2),
+    ("ChEES-HMC", engine.ChEESHMC(tt.target, max_leapfrog=128), 300, 150, 1),
 ):
     t0 = time.perf_counter()
-    res = applemcmc.run(kernel, tt.target, u0, n_warmup=n_warmup,
+    res = engine.run(kernel, tt.target, u0, n_warmup=n_warmup,
                         n_samples=n_samples, thin=thin, seed=1,
                         reanchor_every=100)
     wall = time.perf_counter() - t0

@@ -24,7 +24,7 @@ The odd powers of mu (the standard quadratic law) are not available to Elómë f
 
 | code | central transit, max | central, median | graze (b = 1.02, f = 0.4, 60 deg), max |
 |---|---:|---:|---:|
-| Elómë fp64 (CPU) | 2.22e-16 | 0.00e+00 | 1.11e-16 |
+| Elómë fp64 (CPU) | 1.11e-16 | 0.00e+00 | 1.11e-16 |
 | squishyplanet 0.5.0 (JAX, fp64, CPU) | 8.88e-16 | 0.00e+00 | 3.33e-16 |
 | JoJo 0.1.0 (numpy, fp64) | 1.78e-15 | 0.00e+00 | 3.00e-15 |
 | Elómë fp32 (GPU, Metal) | 6.61e-08 | 2.93e-10 | 8.42e-08 |

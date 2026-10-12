@@ -141,7 +141,7 @@ where both routes stay resident:
 
 Samplers must batch all walkers/chains into one model call — looping is
 ~three orders of magnitude slower. Rules, recipes, and reproducible
-measurements: [docs/sampler-integration.md](../docs/sampler-integration.md).
+measurements: the docs' guide "Many parameter sets at once".
 
 ## Reading the scaling axes
 

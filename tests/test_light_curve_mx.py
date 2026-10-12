@@ -1,7 +1,6 @@
 """TransitModel.light_curve_mx: differentiable in every TransitParams field.
 
-Up to v0.8.2 it read every field through float(), so a gradient taken
-through it was silently zero. It now runs the compiled model graphs with
+It runs the compiled model graphs with
 array-valued fields kept in the graph; eccentricity enters as (e, w)
 directly (anchored.anchor_constants_ew), so d/d(ecc) is right at e = 0.
 
@@ -194,7 +193,7 @@ def test_scalar_value_helper():
 @pytest.mark.parametrize("shape", [(601,), (1,), (1, 1)],
                          ids=["vector", "len1", "1x1"])
 def test_every_field_must_be_a_scalar(dtype, field, shape):
-    """0.9.3 guarded ecc alone, by size: a (601,) rp ran -- one value per
+    """An earlier version guarded ecc alone, by size: a (601,) rp ran -- one value per
     time sample (and died in an opaque reshape on the fp32 kernel route)
     -- and a (1, 1) ecc changed the output's shape. Checked up front, on
     every route, before anything is built."""
@@ -216,7 +215,7 @@ def test_every_field_must_be_a_scalar(dtype, field, shape):
                                    ("polynomial", [0.4])])
 @pytest.mark.parametrize("container", ["mx", "numpy", "nested_list"])
 def test_u_must_be_a_flat_vector_in_every_container(law, u, container):
-    """One container rule. 0.9.5 checked only an mx.array u: a numpy
+    """One container rule. An earlier version checked only an mx.array u: a numpy
     (3, 1) column or a nested list [[.4], [.25], [.05]] still passed the
     coefficient count and ran flux_dev_poly's batched branch -- a
     (3, 601) curve of a wrong-order model, 8.8e-4 off, no error. The
@@ -307,7 +306,7 @@ def test_ew_route_is_as_accurate_as_the_kh_route_in_fp32():
                          ids=["contact", "polynomial"])
 def test_kernel_less_graphs_compile_once_across_streams(kw):
     """Where no kernel branch is reachable, the cache key must not split
-    on the stream (0.9.2 compiled the contact graph twice). The key is
+    on the stream (it once compiled the contact graph twice). The key is
     derived from the branch structure in _get_compiled, not from a rule
     restated in _kernel_usable."""
     model_kw = {k: v for k, v in kw.items() if k in ("exp_time",
@@ -343,9 +342,9 @@ def test_fp32_python_ecc_runs_the_fused_kernel_and_is_bitwise(ecc):
 
 @pytest.mark.skipif(not metal_available(), reason="Metal unavailable")
 def test_a_cpu_stream_call_does_not_poison_the_gpu_cache():
-    """0.9.1 regression: the compiled-graph cache was keyed on circular
+    """Regression: the compiled-graph cache was keyed on circular
     only, and the kernel decision is made at build time from the active
-    stream. The README recipe (an fp64 t0 gradient under the CPU stream)
+    stream. The documented recipe (an fp64 t0 gradient under the CPU stream)
     as a model's FIRST call then cached a kernel-less graph that every
     later GPU light_curve reused (3.4 ms vs 1.4 ms at 2e6 points)."""
     m = elome.TransitModel(params(), T, dtype=mx.float32)
@@ -461,7 +460,7 @@ def test_traced_eccentricity_out_of_range_is_nan_in_value_and_gradient():
     """Under vmap or a caller's compile the value cannot be read, so it
     cannot raise: out of range, the output AND every gradient are NaN --
     never a plausible curve (e = 1.5 used to give a flat one) and never
-    a zero gradient beside a NaN loss (0.9.1 masked it to zero)."""
+    a zero gradient beside a NaN loss (it was once masked to zero)."""
     m = elome.TransitModel(params(), T)
     with mx.stream(mx.cpu):
         f64 = lambda v: mx.array(v, dtype=mx.float64)
@@ -538,7 +537,7 @@ def test_works_on_the_default_stream():
 
 
 def test_mixed_u_list_does_not_borrow_a_dtype():
-    """0.9.6 forced the first mx entry's dtype onto its Python neighbours:
+    """An earlier version forced the first mx entry's dtype onto its Python neighbours:
     u = [mx.array(1), 0.4] turned 0.4 into int 0 (flux 2e-3 off, no
     error), and an fp32 entry rounded its neighbours before the model
     cast. Each entry is now cast on its own, to the model dtype."""
@@ -566,11 +565,11 @@ def test_mixed_u_list_does_not_borrow_a_dtype():
     ("linear", [[0.4], [0.3], [0.5], [0.2]]),
 ])
 def test_array_valued_light_curves_with_per_set_u(law, u_sets):
-    """0.9.6 regression: the array-valued light_curves form -- one
+    """Regression: the array-valued light_curves form -- one
     TransitParams whose attributes are arrays -- takes a per-set
-    (n_sets, N) u (README), and routing it through the single-set
-    normaliser rejected it. (0.9.5's count there was wrong too: it
-    counted sets, not coefficients, for a polynomial law.) It must match
+    (n_sets, N) u (as documented), and routing it through the single-set
+    normaliser rejected it (and once counted sets, not coefficients,
+    for a polynomial law). It must match
     the looped light_curve."""
     u_sets = np.asarray(u_sets)
     n = u_sets.shape[0]

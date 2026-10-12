@@ -149,8 +149,8 @@ class TestEccentricKernelRouting:
 
     @staticmethod
     def _model(ecc, dtype, kernel=True, n=20001, **kw):
-        """kernel=False is use_metal=False: the graph model. (Until
-        0.10.4 this patched _kernel_usable around *construction* only,
+        """kernel=False is use_metal=False: the graph model. (An
+        earlier version patched _kernel_usable around *construction* only,
         but the check runs when the graph is first compiled, so the
         'graph' model ran the kernel and the parity test compared the
         kernel with itself.)"""
@@ -215,7 +215,7 @@ class TestEccentricKernelRouting:
 
 
 # ---------------------------------------------------------------------------
-# v0.13.2 production review
+# production review: regressions
 # ---------------------------------------------------------------------------
 
 def _mp(**kw):

@@ -4,22 +4,38 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "elome"
-version = "0.15.0"
+version = "0.16.0"
 description = "Elómë: analytic, differentiable transit light curves on Apple Silicon (MLX), with a batman-style frontend"
 readme = "README.md"
 license = {text = "MIT"}
+authors = [{name = "David Kipping"}]
 requires-python = ">=3.10"
 dependencies = ["mlx>=0.30", "numpy"]
+keywords = ["exoplanets", "transits", "light curves", "limb darkening",
+            "oblate planets", "MLX", "Metal", "Apple Silicon"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+
+[project.urls]
+Documentation = "https://elome.readthedocs.io"
+Source = "https://github.com/davidkipping/elome"
+Issues = "https://github.com/davidkipping/elome/issues"
 
 [project.optional-dependencies]
 test = ["pytest", "scipy", "batman-package", "mpmath"]
-# the sampling engine (anvil, formerly applemcmc) is an optional
-# integration dependency — install it separately for elome.anvil:
+docs = ["sphinx>=7", "myst-nb>=1.1", "sphinx-book-theme>=1.1",
+        "sphinx-copybutton", "sphinx-design"]
+# the sampling engine, anvil, is an optional integration dependency --
+# install it separately for elome.anvil:
 #   pip install git+https://github.com/davidkipping/anvil
 
 [tool.setuptools.packages.find]
-# elome, plus the deprecated `metalplanet` alias (a shim re-exporting it)
-include = ["elome*", "metalplanet"]
+include = ["elome*"]
 
 [tool.pytest.ini_options]
 markers = ["slow: long-running statistical/integration tests"]

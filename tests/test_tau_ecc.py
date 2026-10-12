@@ -110,7 +110,7 @@ def test_contact_rule_against_the_exact_integral(name, g):
     misplaced split only slows it), so it stands in for the exact
     integral. n_gl = 5 then has to be as good as the circular rule makes
     it: measured worst 6.8e-7, on e = 0.7's fast ingress. (Linearised
-    contacts, as TransitModel used before 0.8.1, reach 2.9e-6 on the
+    contacts reach 2.9e-6 on the
     e = 0.5 orbit.)"""
     def at(n):
         return run(TAU, g, mx.float64, integration="contact",

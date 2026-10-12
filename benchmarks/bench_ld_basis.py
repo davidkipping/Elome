@@ -1,13 +1,12 @@
 """flux_dev_from_tau(..., ld_basis=True) against the scalar call.
 
-The question SquishierPlanet asked: what does the limb-darkening basis
-cost relative to one scalar call -- t(ld_basis=True) / t(scalar) -- for
-the forward and for value+grad? Their working assumption was <= 1.3x.
+What does the limb-darkening basis cost relative to one scalar call --
+t(ld_basis=True) / t(scalar) -- for the forward and for value+grad?
 Alongside it, the route the basis replaces: three scalar calls, one per
 vertex law u = (0,0), (2,-1), (0,1).
 
 Shape: 512 chains x 5,000 phase-ordered points, contact rule, n_gl = 5,
-Kepler long cadence -- the collapsed target's production configuration.
+Kepler long cadence -- a collapsed-limb-darkening sampler's configuration.
 
 Every configuration runs in its own subprocess (a memory-heavy run
 poisons later timings through thermal and buffer-cache state), and the
@@ -42,7 +41,7 @@ def worker(route, grad, n, m, integration, reps):
     from elome.metal import flux_dev_from_tau
 
     rng = np.random.default_rng(11)
-    # phase-ordered: each chain's points ascend in tau, as turin feeds them
+    # phase-ordered: each chain's points ascend in tau, as a sampler feeds them
     tau = np.linspace(-0.14, 0.14, m)[None, :] + np.zeros((n, 1))
     tau += rng.normal(0.0, 1e-4, (n, m))
     tau = mx.array(np.sort(tau, axis=1).astype(np.float32))

@@ -8,7 +8,7 @@ dw/dk = -h/e, which diverges; the divergence cancels against a matching
 term routed through M_tra, so the finite answer is a difference of two
 O(a/e) quantities. Measured through the graph path, that costs 6e-4
 relative gradient error at e = 1e-3, 5% at 1e-5 and 40% at 1e-6
-(benchmarks/v3_kh_grad_conditioning.py) — i.e. HMC would be sampling
+(benchmarks/kh_grad_conditioning.py) — i.e. HMC would be sampling
 noise exactly where the (k, h) parameterization is supposed to shine.
 
 This module removes the cancellation structurally by anchoring the

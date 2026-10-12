@@ -116,7 +116,7 @@ class TestParityWithTransitModel:
     @needs_metal
     def test_kernel_matches_its_own_graph_path(self):
         """The fallback is a supported path, so it must compute the same
-        function -- turin certifies in fp64 and runs in fp32."""
+        function -- a sampler certifies in fp64 and runs in fp32."""
         tau = boundary_taus(NOM["a"], NOM["b"], NOM["r"])
         for integ, kw in (("none", {}), ("contact", dict(exp_time=EXP)),
                           ("supersample", dict(exp_time=EXP, n_sub=15))):
@@ -272,7 +272,7 @@ def test_no_nan_gradients_on_boundary_sweep():
 # ---------------------------------------------------------------------------
 # The graph path with more than one chain
 #
-# Reported by turin: the fp64 graph path could not broadcast per-chain
+# Regression: the fp64 graph path could not broadcast per-chain
 # parameters for n_chains > 1, in any spelling including scalars. The
 # exposure rules append a node axis to the times, and the parameters were
 # shaped (n, 1) regardless -- which broadcasts against anything when
@@ -363,7 +363,7 @@ def test_kernel_and_graph_agree_on_distinct_chains(integ, kw):
 
 @pytest.mark.parametrize("integ,kw", MODES, ids=[m[0] for m in MODES])
 def test_graph_path_gradients_at_many_chains(integ, kw):
-    """fp64 is turin's reference path, so its gradients have to survive
+    """fp64 is a sampler's reference path, so its gradients have to survive
     batching too -- not just its forward."""
     n, m = 5, 96
     p = _distinct_chains(n)
@@ -486,7 +486,7 @@ class TestContract:
                       - call(tau, integration="none")).max() == 0.0
 
     def test_gradient_flows_through_a_tau_built_from_parameters(self):
-        """The point of the entry point: turin's tau is a function of
+        """The point of the entry point: a TTV sampler's tau is a function of
         sampled offsets, so d/d(offset) must be non-zero and correct."""
         t = mx.array(np.linspace(-0.1, 0.1, 128), dtype=mx.float32)
 

@@ -295,7 +295,7 @@ inline void ob_aberth(float S0, float2 S1, float S2, float p, thread float2 *z) 
 }
 // all four roots and only them: small residuals, and Vieta's sum
 // (-S1/S2) and product (1) -- a duplicated root standing in for a missing
-// one (Stage 1's failure) fails the sum or the product
+// one fails the sum or the product
 inline bool ob_good(thread const float2 *z, float S0, float2 S1, float S2,
                     float p) {
     float2 sum = float2(0.0f), prod = float2(1.0f, 0.0f);

@@ -8,8 +8,8 @@ A quadratic law is linear in its intensity coefficients, so
 with B = flux_dev_from_tau(..., ld_basis=True) depending on geometry
 alone. That identity is the contract, and these tests hold both paths to
 it: the fp32 kernel at the scalar kernel's own noise, the fp64 graph path
-at ~1e-14. Requested by SquishierPlanet, whose collapsed-LD target builds
-every vertex law from one call instead of three.
+at ~1e-14. A sampler that marginalises the limb darkening builds every
+vertex law from one call instead of three.
 
 ld_basis=False must be untouched. The scalar kernels' source is not
 edited at all (the basis kernels are separate), and the rest of the suite
@@ -361,7 +361,7 @@ def test_shapes(dtype):
 @pytest.mark.parametrize("dtype", [mx.float32, mx.float64],
                          ids=["fp32", "fp64"])
 def test_smaller_batch_after_compile(dtype):
-    """turin's precision probe calls with the first 32 of 512 chains,
+    """A sampler's precision probe calls with the first 32 of 512 chains,
     through the same compiled function."""
     if dtype == mx.float32 and not metal_available():
         pytest.skip("Metal kernels unavailable")

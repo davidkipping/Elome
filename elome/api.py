@@ -79,7 +79,7 @@ def _is_vector_law(law) -> bool:
 
 def _is_oblate(params) -> bool:
     """params.f given = an oblate planet. theta alone is an error (it is an
-    oblate planet's); a TransitParams from before 0.13 has neither."""
+    oblate planet's); a TransitParams without the attributes has neither."""
     obl = getattr(params, "f", None) is not None
     if not obl and getattr(params, "theta", None) is not None:
         raise ValueError("params.theta is an oblate planet's; set "
@@ -329,8 +329,13 @@ class TransitModel:
         transittype: "primary" or "secondary".
         supersample_factor: average this many samples over exp_time.
         exp_time: exposure time (same units as t).
-        dtype: mx.float64 (default; CPU) or mx.float32 (default stream —
-            only sensible for well-conditioned times).
+        dtype: mx.float64 (default; CPU, exact) or mx.float32 (the GPU
+            kernels). In float32 the times are re-centred on the host in
+            float64 first, so absolute mission times are fine; over
+            hundreds of orbits the float32 phase loses precision.
+        integration: "supersample" (batman's rule) or "contact"
+            (Gauss-Legendre on windows split at the contact times).
+        n_gl: Gauss-Legendre nodes per piece for "contact".
     """
 
     def __init__(self, params, t, transittype: str = "primary",
@@ -985,7 +990,7 @@ class TransitModel:
         batman parity — and calling it in a loop is the single worst thing
         a sampler can do here (a GPU dispatch costs ~0.2-0.7 ms whatever
         its size, so looping is two to three orders of magnitude slower
-        than batching; see docs/sampler-integration.md). This is the
+        than batching; see the sampler guide in the docs). This is the
         batched form: the same times, many parameter sets, one dispatch.
 
         ``params_seq`` is either a sequence of TransitParams or a single

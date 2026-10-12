@@ -1,14 +1,13 @@
-"""Oblate planets, Stage 2: flux_dev_from_tau(..., f=, theta=).
+"""Oblate planets on an orbit: flux_dev_from_tau(..., f=, theta=).
 
-Sky frame and theta pinned to SquishierPlanet (importorskip); per-side
+Sky frame and theta pinned to an independent numpy orbit, and light curves
+to an independent quadrature (tests/oblate_oracle.py); per-side
 contacts against a dense, independent reference; the exposure rules; f = 0
 against the spherical path; fp32 against fp64; gradients against finite
 differences in every input; the keyword checks.
 """
 
 import math
-import sys
-from pathlib import Path
 
 import numpy as np
 import mlx.core as mx
@@ -16,20 +15,10 @@ import pytest
 
 import elome as el
 from elome import oblate_tau as OT
-from elome.hybrid import hybrid_norms, w_to_c
+from elome.hybrid import hybrid_norms
 from elome.metal import _ecc_shape
 
-_SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
-if _SP.is_dir() and str(_SP) not in sys.path:
-    sys.path.insert(0, str(_SP))
-try:
-    from squishierplanet import laws as spl
-    from squishierplanet.model import light_curve as sp_light_curve
-    from squishierplanet.orbit import sky_position
-except Exception:
-    spl = None
-
-needs_sp = pytest.mark.skipif(spl is None, reason="squishierplanet not importable")
+import oblate_oracle as OR
 
 P, A_RS = 3.45, 8.8
 W = {"hybrid2": [0.3, 0.2], "hybrid4": [0.2, 0.2, 0.1, 0.1],
@@ -60,9 +49,10 @@ def cos_i(b, k, h):
 # sky frame
 # ---------------------------------------------------------------------------
 
-@needs_sp
 @pytest.mark.parametrize("e,w", [(0.0, math.pi / 2), (0.3, 1.0), (0.6, -2.0)])
-def test_sky_frame_is_squishierplanets(e, w):
+def test_sky_frame_matches_a_numpy_orbit(e, w):
+    """X along the motion at transit, Y across, front = nearer than the
+    star: the package's sky frame against a textbook Keplerian orbit."""
     k, h = kh(e, w)
     b = 0.3
     ci = cos_i(b, k, h)
@@ -77,10 +67,9 @@ def test_sky_frame_is_squishierplanets(e, w):
             X, Y, _, _, front = OT.sky_anchored(f64(phi), A_RS, ci,
                                                 anchor_constants(f64(k), f64(h)))
         X, Y, front = np.asarray(X), np.asarray(Y), np.asarray(front)
-    Xr, Yr, Zr = sky_position(t, period=P, a=A_RS, i=math.acos(ci), t0=0.0,
-                              e=e, omega=w)
+    Xr, Yr, fr = OR.sky_position(t, P, A_RS, math.acos(ci), e, w)
     assert np.abs(X - Xr).max() < 1e-13 and np.abs(Y - Yr).max() < 1e-13
-    assert np.array_equal(front, Zr > 0)
+    assert np.array_equal(front, fr)
 
 
 def test_sky_derivatives():
@@ -101,18 +90,21 @@ def test_sky_derivatives():
 
 
 # ---------------------------------------------------------------------------
-# light curves against SquishierPlanet
+# light curves against the reference
 # ---------------------------------------------------------------------------
 
+def reference_curve(tau, law, r, f, theta, inc, e, w):
+    """F - 1 from the numpy orbit and the polar-ray quadrature."""
+    X, Y, front = OR.sky_position(tau, P, A_RS, inc, e, w)
+    x0 = X * math.cos(theta) + Y * math.sin(theta)
+    y0 = -X * math.sin(theta) + Y * math.cos(theta)
+    A = r / math.sqrt(1 - f)
+    out = np.zeros(len(tau))
+    near = front & (np.hypot(x0, y0) < 1 + A)
+    out[near] = OR.law_flux_dev(law, W[law], x0[near], y0[near], A, A * (1 - f))
+    return out
 
-def _sp_law(law):
-    """Elómë's law definition as a squishierplanet Law (its own poles, so
-    the comparison holds whatever poles that checkout ships)."""
-    L = el.HYBRID_LAWS[law]
-    return spl.Law(*w_to_c(L, W[law]), L.eps)
 
-
-@needs_sp
 @pytest.mark.parametrize("law", ["hybrid2", "hybrid4", "hybrid5"])
 @pytest.mark.parametrize("r,f,theta,b,e,w", [
     (0.1, 0.1, 0.4, 0.3, 0.0, 0.0),
@@ -122,7 +114,7 @@ def _sp_law(law):
     (0.1, 0.3, 2.0, 0.5, 0.3, 1.0),
     (0.08, 0.2, 0.3, 0.2, 0.6, -2.0),
 ])
-def test_light_curve_matches_squishierplanet(law, r, f, theta, b, e, w):
+def test_light_curve_matches_the_reference(law, r, f, theta, b, e, w):
     kw = dict(f=f, theta=theta, integration="none")
     inc = math.acos(b / A_RS)
     if e > 0:
@@ -130,9 +122,7 @@ def test_light_curve_matches_squishierplanet(law, r, f, theta, b, e, w):
         kw.update(secosw=k, sesinw=h)
         inc = math.acos(cos_i(b, k, h))
     got = flux(TAU, b, r, law, **kw)
-    ref = sp_light_curve(TAU, _sp_law(law), r_eff=r, f=f,
-                         theta=theta, period=P, a=A_RS, i=inc, t0=0.0, e=e,
-                         omega=w if e > 0 else np.pi / 2) - 1.0
+    ref = reference_curve(TAU, law, r, f, theta, inc, e, w if e > 0 else math.pi / 2)
     assert ref.min() < -1e-4                       # a transit is tested
     assert np.abs(got - ref).max() < 1e-12
 
@@ -145,12 +135,11 @@ _PSI = np.linspace(0, 2 * np.pi, 1024, endpoint=False)
 
 
 def _ref_q_M(phi, a, b, e, w, A, B, th):
-    """Independent q and M (numpy, SquishierPlanet's orbit), far side inf."""
+    """Independent q and M (the numpy orbit), far side inf."""
     k, h = kh(e, w) if e > 0 else (0.0, 0.0)
     inc = math.acos(cos_i(b, k, h)) if e > 0 else math.acos(b / a)
-    X, Y, Z = sky_position(np.atleast_1d(phi) * P / (2 * np.pi), period=P,
-                           a=a, i=inc, t0=0.0, e=e,
-                           omega=w if e > 0 else np.pi / 2)
+    X, Y, front = OR.sky_position(np.atleast_1d(phi) * P / (2 * np.pi), P, a, inc,
+                                  e, w if e > 0 else np.pi / 2)
     c, s = math.cos(th), math.sin(th)
     x0, y0 = X * c + Y * s, -X * s + Y * c
     sv = (x0[:, None] + A * np.cos(_PSI)) ** 2 + (y0[:, None] + B * np.sin(_PSI)) ** 2
@@ -166,7 +155,7 @@ def _ref_q_M(phi, a, b, e, w, A, B, th):
 
     q = np.where((x0 / A) ** 2 + (y0 / B) ** 2 < 1, 0.0, polish(_PSI[sv.argmin(1)]))
     Mx = polish(_PSI[sv.argmax(1)])
-    return np.where(Z > 0, q, np.inf), np.where(Z > 0, Mx, np.inf)
+    return np.where(front, q, np.inf), np.where(front, Mx, np.inf)
 
 
 def _ref_contacts(a, b, e, w, A, B, th):
@@ -208,7 +197,6 @@ def _contact_cases():
     return np.array(rows).T
 
 
-@needs_sp
 @pytest.mark.parametrize("dtype", [mx.float64, mx.float32], ids=["fp64", "fp32"])
 def test_contacts_match_a_dense_reference(dtype):
     b, r, f, th, e, w = _contact_cases()
@@ -428,7 +416,7 @@ def test_theta_defaults_to_zero():
 
 
 def test_contact_offsets_oblate_takes_any_input():
-    """The public export follows the package's input conventions (0.13.1's
+    """The public export follows the package's input conventions (it once
     rejected Python floats, numpy, and fp64 arrays on the GPU stream)."""
     ref = [float(np.asarray(c).ravel()[0]) for c in OT.contact_offsets_oblate(
         *(mx.array([v], dtype=mx.float64) for v in (10.0, 0.3, 0.1, 0.2, 0.5)))]

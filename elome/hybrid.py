@@ -1,7 +1,7 @@
 """Hybrid limb-darkening laws: even powers of mu plus double poles.
 
-SquishierPlanet (docs/notes, "The resulting law") defines a family of laws
-built from a few even powers of mu and "double-pole" terms
+The hybrid-law paper (in preparation) defines a family of laws built
+from a few even powers of mu and "double-pole" terms
 
     P_eps(mu) = (mu^2 + eps)^-2,        eps > 0,
 
@@ -23,11 +23,12 @@ term carries:
 with the poles of hybrid4 and hybrid5 on the analytic ladder
 eps_k = exp[(2 pi / sqrt alpha) (sqrt(k + 1/2) - sqrt K)] -- hybrid5 at
 K = 3, alpha = 1; hybrid4 at K = 2, alpha = 25/16 (eps = 0.0286, 0.3858) --
-and hybrid2's single pole at eps = 0.36, both tunings LDhybrid v1.0's over
-PHOENIX and MPS-ATLAS models in 37 passbands. Out of sample there (8,100
-model-bands, median light-curve error) hybrid4 reaches 1.8 ppm and hybrid5
-1.1 ppm, against 2.0 ppm for the Claret four-parameter law. The physical region is an exact triangle for hybrid2 and, for the
-others, the simplex w_j >= 0, sum w_j <= 1 (``ld.hybrid2_from_q``,
+and hybrid2's single pole at eps = 0.36, both tuned over PHOENIX and
+MPS-ATLAS models in 37 passbands in the hybrid-law coefficients paper (in
+preparation). Out of sample there (8,100 model-bands, median light-curve
+error) hybrid4 reaches 1.8 ppm and hybrid5 1.1 ppm, against 2.0 ppm for
+the Claret four-parameter law. The physical region is an exact triangle
+for hybrid2 and, for the others, the simplex w_j >= 0, sum w_j <= 1 (``ld.hybrid2_from_q``,
 ``ld.simplex_from_q`` sample them uniformly).
 
 Why they are cheap here. The laws were designed so an *oblate* planet's
@@ -105,17 +106,17 @@ __all__ = ["HybridLaw", "HYBRID2", "HYBRID4", "HYBRID5", "LAWS",
 _PI = math.pi
 _TWO_PI = 2.0 * math.pi
 
-#: hybrid2's single pole, as SquishierPlanet / LDhybrid v1.0 tune it over 198
-#: PHOENIX v3.0 and MPS-ATLAS models x 37 passbands: the 90th/99th-percentile
-#: light-curve errors are minimised at 0.35-0.36, where hybrid2 beats
-#: quadratic in 73% of model-bands
+#: hybrid2's single pole, tuned over 198 PHOENIX v3.0 and MPS-ATLAS models x
+#: 37 passbands (hybrid-law coefficients paper, in preparation): the
+#: 90th/99th-percentile light-curve errors are minimised at 0.35-0.36, where
+#: hybrid2 beats quadratic in 73% of model-bands
 HYBRID2_EPS = 0.36
 
 #: hybrid4's poles: the analytic ladder at K = 2 with alpha_eff = 25/16
-#: (ln eps scaled by 0.8), LDhybrid v1.0's tuning. Over 8,100 model-bands
-#: outside its pole study the median light-curve error is 1.8 ppm, against
-#: 5.8 at alpha_eff = 1, as good as the free two-pole optimum. hybrid5 is
-#: near-optimal at alpha_eff = 1 and keeps it.
+#: (ln eps scaled by 0.8), tuned in the hybrid-law coefficients paper (in
+#: preparation): over 8,100 model-bands outside the tuning set the median
+#: light-curve error is 1.8 ppm, as good as the free two-pole optimum.
+#: hybrid5 is near-optimal at alpha_eff = 1.
 HYBRID4_ALPHA = 25.0 / 16.0
 
 #: half-width in y = V/U of the series bridge across the Q = 0 line, by
@@ -391,7 +392,7 @@ def _pole_terms(g, eps: float):
     # -Bp >= 0 on partial lanes, but where z + r rounds to exactly 1 it is
     # -0.0: ratio = (eps + Bp)/nBp then flips to -inf, the lane drops into
     # the log form and sqrt(-Q) is NaN (fp32, ~1 point in 10 within two
-    # ulps of the internal contact; v0.10.7 and before). There the depth
+    # ulps of the internal contact, unguarded). There the depth
     # is kite^2 / A (kite^2 = A (-Bp)), which is what kite already carries.
     #
     # Near the INTERNAL contact the roles swap: -Bp = 1 - (z + r)^2 is

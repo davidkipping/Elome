@@ -1,34 +1,45 @@
 # Changelog
 
-All notable changes to Elómë (formerly MetalPlanet; entries before the
-rename keep the old name). Versioning: semantic-ish (MAJOR.MINOR.PATCH);
+All notable changes to Elómë. Versioning: semantic-ish (MAJOR.MINOR.PATCH);
 every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-10-12
+
+The first public-facing release.
+
 ### Documentation
-- anvil is public: the README links it
-  (github.com/davidkipping/anvil) and gives its install command in place
-  of "not yet public", and so do the pyproject comment and the
-  ImportError raised when it is missing.
-- README: MLX's float64 `sin`, `cos`, `exp` and `erf` are only
-  float32-accurate. Elómë's own results are unaffected, since it uses
-  `elome.trig.sincos`. A caller's MLX preprocessing, though, can carry the
-  error into a float64 light curve (reported by SquishierPlanet).
+- **A documentation site** (Sphinx, for Read the Docs): getting started,
+  separate paths for spherical and oblate planets, guides shared by both
+  (exposures, batching, gradients and precision, the sampler API),
+  the three tutorials rendered with their outputs, the hybrid-law
+  definitions, performance, how it works, an API reference, citing and the
+  name. The README is now a short landing page that points to it. The
+  development plans and design notes are retired from the repository.
+- anvil is public: the docs link it and give its install command, and so
+  does the ImportError raised when it is missing.
+- MLX's float64 `sin`, `cos`, `exp` and `erf` are only float32-accurate.
+  Elómë's own results are unaffected, since it uses `elome.trig.sincos`,
+  but a caller's MLX preprocessing can carry the error into a float64
+  light curve; the docs say so.
+
+### Removed
+- The deprecated import alias added in 0.14.0.
+- `import_engine` no longer looks for the sampling engine under a former
+  package name.
 
 ## [0.15.0] — 2026-10-11
 
 ### Changed
-- **hybrid4's poles move to LDhybrid v1.0's tuned ladder**: the analytic
-  ladder with alpha_eff = 25/16 (ln eps scaled by 0.8), eps = 0.0286,
-  0.3858 (was alpha_eff = 1: 0.0118, 0.304). Over 8,100 model-passband
-  combinations outside LDhybrid's pole study the median light-curve error
-  falls from 5.8 to 1.8 ppm (Claret four-parameter 2.0, hybrid5 1.1), as
-  good as the free two-pole optimum; the free-coefficient depth bias falls
-  from 34 to 12 ppm (max, PHOENIX). hybrid4 light curves change; weights fitted
-  with the old poles, or LDhybrid tables before v1.0's change, do not
-  carry over. hybrid2 and hybrid5 are unchanged. New constants
-  `HYBRID4_ALPHA`, `HYBRID4_EPS` (also exported from `elome`).
+- **hybrid4's poles move to the tuned ladder** of the hybrid-law
+  coefficients study: the analytic ladder with alpha_eff = 25/16, eps =
+  0.0286, 0.3858. Over 8,100 model-passband combinations outside the pole
+  study the median light-curve error is 1.8 ppm (Claret four-parameter
+  2.0, hybrid5 1.1), as good as the free two-pole optimum. hybrid4 light
+  curves change, and weights fitted before this release do not carry
+  over. hybrid2 and hybrid5 are unchanged. New constants `HYBRID4_ALPHA`,
+  `HYBRID4_EPS` (also exported from `elome`).
 
 ### Added
 - The name in the docs: the README title also shows Elómë in Tengwar
@@ -40,17 +51,10 @@ every release is tagged `vX.Y.Z` in git.
 ## [0.14.0] — 2026-10-11
 
 ### Changed
-- **Renamed: MetalPlanet is now Elómë** (Quenya: Él "star" + lómë
-  "dimness"). The package is `elome` -- `import elome`, distribution
-  `elome` -- and every module keeps its name (`elome.anvil`,
-  `elome.oblate`, ...). Results are unchanged (outputs and kernel sources
-  bitwise v0.13.2). Notebook 01 is now `01_elome_with_anvil.ipynb`.
-- `import metalplanet` keeps working as a deprecated alias: a shim
-  re-exporting `elome` (the same module objects, so caches and
-  monkeypatches are shared) with a DeprecationWarning, to be removed in a
-  future release. It also serves environments whose editable install
-  predates the rename: there it loads `elome` from the folder beside it.
-  Reinstall (`pip install -e .`) to register `elome` itself.
+- **The package is Elómë** (Quenya: él "star" + lómë "dimness"):
+  `import elome`, distribution `elome`. Results are unchanged (outputs and
+  kernel sources bitwise v0.13.2). A deprecated import alias kept older
+  installations working until it was removed.
 
 ## [0.13.2] — 2026-10-11
 
@@ -80,7 +84,8 @@ A production-readiness review of the package, and the oblate tutorial.
   circular and eccentric models; both now take "metal", "analytic"
   (alias "graph") and "autodiff".
 - **`import_engine`** turned any ImportError from an installed `anvil`
-  into "No module named 'applemcmc'"; it now reports the real error.
+  into a misleading "No module named ..." error; it now reports the
+  real error.
 - **`metal_available`** failing was silent (every fp32 call then ran the
   ~10x slower graph); it now warns once with the exception, and
   `metal_available(reprobe=True)` probes again.
@@ -110,10 +115,10 @@ A production-readiness review of the package, and the oblate tutorial.
   gradients, batching, `flux_dev_from_tau` and `ld_basis`), then the
   oblate geometry, the oblateness signal against an equal-area sphere,
   per-side contacts, eccentric orbits, cost and limits. Needs only
-  metalplanet; runs in about a minute.
-- `docs/sampler-integration.md`: "Sampling an oblate planet".
+  elome; runs in about a minute.
+- The sampler guide: "Sampling an oblate planet".
 - `contact_offsets_oblate` exported at the top level (it was public in
-  `metalplanet.oblate_tau`); notebook 03 uses only public API.
+  `elome.oblate_tau`); notebook 03 uses only public API.
 
 ## [0.13.1] — 2026-10-11
 
@@ -151,29 +156,26 @@ Oblate planets: an elliptical planet (area-equivalent radius, projected
 flattening f, sky angle theta) for the hybrid laws, on every surface --
 the exact MLX graph, `flux_dev_from_tau(f=, theta=)` with fp32 Metal
 kernels and analytic gradients, and `TransitParams.f` / `.theta`. Spherical
-planets are untouched (f = None). Plan and measurements:
-`docs/oblate-plan.md`; cross-code comparison: `benchmarks/oblate_compare/`.
+planets are untouched (f = None). Cross-code comparison:
+`benchmarks/oblate_compare/`.
 
 ### Added
-- **Oblate planets, Stage 1: the reference graph** (`metalplanet/oblate.py`,
-  plan in `docs/oblate-plan.md`). `flux_dev_oblate(x0, y0, r, f, w, law)`
+- **Oblate planets: the reference graph** (`elome/oblate.py`). `flux_dev_oblate(x0, y0, r, f, w, law)`
   and `shape_cols_oblate(x0, y0, r, f, law)` give the hybrid laws' transit
   of an ellipse with area-equivalent radius r and flattening f, the centre
   in the planet's principal frame (`oblate.principal_frame(X, Y, theta)`).
   An MLX graph in fp64 and fp32, differentiable in every input, under the
-  usual data contract. Agrees with SquishierPlanet's analytic reference to
+  usual data contract. Agrees with an independent analytic reference to
   3e-15 (fp64) and 4e-7 (fp32) of each column's unocculted flux over its
   topology classes and limb- and pole-tangency stress sets. Below
   f = 1e-10 (fp64) / 1e-5 (fp32) it returns the spherical columns. The
-  domain is r <= (1 - f)^1.5. This is the reference the Stage 3 Metal
-  kernels will be validated against; it is slow (~20 us per point) and
-  the transit-time entry points do not take f yet.
-- **Oblate planets, Stage 2: on an orbit.** `flux_dev_from_tau(...,
+  domain is r <= (1 - f)^1.5. This is the reference the Metal kernels
+  are validated against.
+- **Oblate planets on an orbit.** `flux_dev_from_tau(...,
   limb_dark=<hybrid law>, u=w, f=f, theta=theta)`, with f and theta
   scalars or per chain, circular or eccentric orbits, every exposure rule,
-  and the `ld_basis=True` form. The sky frame and theta are
-  SquishierPlanet's (light curves agree with its `model.light_curve` to
-  5e-16). The contact rule splits at the oblate planet's own contacts,
+  and the `ld_basis=True` form (light curves agree with an independent
+  reference to 5e-16). The contact rule splits at the oblate planet's own contacts,
   solved per side (a tilted planet's ingress and egress differ, and a
   grazing one can have both outer contacts on one side of conjunction):
   exact to 2e-15 rad in fp64, and on 30-minute exposures 4-40x more
@@ -181,8 +183,7 @@ planets are untouched (f = None). Plan and measurements:
   equals the spherical path's to 2e-17. Without f and theta, nothing on
   the spherical paths changes (bitwise). Out-of-domain array arguments
   give NaN rather than raising, so the call stays compilable.
-- **Oblate planets, Stage 3: fp32 Metal kernels** (`metalplanet/
-  metal_oblate.py`). fp32 data on the GPU now takes fused kernels for every
+- **Oblate planets: fp32 Metal kernels** (`elome/metal_oblate.py`). fp32 data on the GPU now takes fused kernels for every
   exposure rule, circular and eccentric orbits, the scalar and `ld_basis`
   forms, forward and VJP. Within 2e-7 of the fp64 graph in flux; gradients
   in every input (tau, period, a, b, r, f, theta, the weights,
@@ -197,14 +198,14 @@ planets are untouched (f = None). Plan and measurements:
   per point, ~60-75x under the contact rule (the spherical hybrid kernel
   is ~0.2 ns per node there; the oblate one ~14).
 
-- **Oblate planets, Stage 4: `TransitParams.f` and `.theta`.** Optional,
+- **Oblate planets in the frontend: `TransitParams.f` and `.theta`.** Optional,
   None by default (spherical, bitwise unchanged); `theta` in degrees like
   `inc` and `w`. An oblate model needs a hybrid law and a primary transit.
   `light_curve`, `light_curves` (per-set f and theta) and
   `light_curve_mx` (differentiable in f and theta) all route through
   `flux_dev_from_tau(f=, theta=)` -- the oblate kernels on an fp32 GPU
-  model -- with the model's own exposure rule. Light curves agree with
-  SquishierPlanet's `model.light_curve` to 8e-16 in absolute times;
+  model -- with the model's own exposure rule. Light curves agree with an
+  independent reference to 8e-16 in absolute times;
   f = 0 equals the spherical model to 2e-15. Switching a model between
   spherical and oblate raises, as a changed law does.
 - `benchmarks/bench_oblate.py`: oblate vs spherical, per law, forward and
@@ -227,12 +228,12 @@ planets are untouched (f = None). Plan and measurements:
   by 1.5e-4 of its norm, and the fp32 graph's d/dz by 2.5e-3 at r = 0.95.
   The smaller of 1 - (z - r)^2 and (z + r)^2 - 1 is now always derived
   from kite^2 = their product. Now 1.4e-15 (fp64) and 8e-7 (fp32) of the
-  norm there; r <= 0.5 was already at rounding. Found answering
-  SquishierPlanet, whose pole moments were right. Hybrid outputs move at
+  norm there; r <= 0.5 was already at rounding. Found in a cross-check
+  against a transit research tool. Hybrid outputs move at
   rounding elsewhere; the quadratic paths are bitwise unchanged.
 
 ### Changed
-- The oblate graph's quartic roots are seeded by MetalPlanet's own 4x4
+- The oblate graph's quartic roots are seeded by Elómë's own 4x4
   complex eigensolver (balanced, Wilkinson-shifted Hessenberg QR, written
   in elementwise operations) instead of `mx.linalg.eigvals`, which runs
   only on the CPU in complex64 and has no Metal counterpart. Same accuracy
@@ -257,7 +258,7 @@ Code-review round on 0.12.1.
   given a digest of the definition.
 - **A law name and its equal law object counted as different laws**:
   a model built with `"hybrid2"` raised "law changed" when called with
-  `metalplanet.HYBRID2`, and the reverse. `_check_law` compares the
+  `elome.HYBRID2`, and the reverse. `_check_law` compares the
   resolved laws' definitions.
 - **A model re-read the registry on every new graph trace**, so re-binding
   or deleting a registered name after construction could make one model
@@ -313,16 +314,16 @@ Code-review round on 0.12.0.
 - `TransitModel` with a hybrid2-type and a two-pole custom law on every
   path and precision; equal law objects; a law registered after import;
   a renamed registered law sharing its kernels; vertices returned fresh.
-- `test_hybrid2_pole_matches_squishierplanet` fails if either package
-  moves hybrid2's pole; the prior cross-check now compares both packages'
-  default priors (it passed SquishierPlanet's pole to ours before).
+- A cross-check against a transit research tool fails if either
+  package moves hybrid2's pole; the prior cross-check compares both
+  packages' default priors.
 
 ## [0.12.0] — 2026-10-10
 
 ### Changed
-- **hybrid2's pole is eps = 0.36** (`HYBRID2_EPS`), SquishierPlanet /
-  LDhybrid v1.0's tuning over 198 PHOENIX v3.0 and MPS-ATLAS models x 37
-  passbands: the 90th/99th-percentile light-curve errors are minimised at
+- **hybrid2's pole is eps = 0.36** (`HYBRID2_EPS`), the hybrid-law
+  coefficients study's tuning over 198 PHOENIX v3.0 and MPS-ATLAS models x
+  37 passbands: the 90th/99th-percentile light-curve errors are minimised at
   0.35-0.36, where hybrid2 beats quadratic in 73% of model-bands. hybrid2
   light curves and its prior triangle (vertices (-0.1246, 1.1246) and
   (1.2010, -0.2010)) follow; hybrid4/5 are unchanged.
@@ -339,8 +340,7 @@ Code-review round on 0.12.0.
 ### Added
 - `hybrid2_vertices`, `hybrid2_from_q`, `hybrid2_from_q_np`,
   `hybrid2_to_q_np` take `law=` (a name or a hybrid2-type `HybridLaw`), so
-  a prior is tied to the law it serves, or `eps=`, as SquishierPlanet's
-  do; `law=` refuses a non-hybrid2-type law and a conflicting `eps=`.
+  a prior is tied to the law it serves, or `eps=`; `law=` refuses a non-hybrid2-type law and a conflicting `eps=`.
 - `HYBRID2_EPS` is exported; the supported limb-darkening names derive
   from the hybrid law registry (`hybrid.LAWS`).
 
@@ -351,8 +351,7 @@ Code-review round on 0.12.0.
   gets its own kernel (z and tau paths) and a non-identifier law name
   compiles -- both fail on the old keying; the prior's `law=` path at a
   non-default pole (constraints, monotone profile, round trip, MLX =
-  numpy) and its argument checks. The SquishierPlanet cross-checks skip
-  hybrid2 on a checkout whose pole differs.
+  numpy) and its argument checks.
 
 ## [0.11.0] — 2026-10-10
 
@@ -435,7 +434,7 @@ form at a time.
   the differentiated function runs wholly on the CPU stream (verified;
   a cast with its own CPU-stream backward pass, the review's proposed
   root fix, raises too). The supported form -- the `mx.grad` call under
-  `mx.stream(mx.cpu)` -- is now stated in `metalplanet.dtypes`, the entry
+  `mx.stream(mx.cpu)` -- is now stated in `elome.dtypes`, the entry
   points' docstrings and the README, and pinned by a test.
 
 ### Fixed
@@ -471,7 +470,7 @@ form at a time.
   is cast on the active stream, the CPU round trip kept for fp64 only.
 
 ### Changed
-- The contract lives in one module, `metalplanet/dtypes.py`
+- The contract lives in one module, `elome/dtypes.py`
   (`as_data`, `fp64_on_cpu`, still re-exported from `metal`), shared by
   the kernel entry points and the graph functions.
 
@@ -712,9 +711,9 @@ unnecessary.
 ## [0.10.0] — 2026-10-08
 
 ### Added
-- **Hybrid limb-darkening laws, stage 1 of 3: closed forms and the fp64
-  reference** (`metalplanet/hybrid.py`). SquishierPlanet's hybrid2,
-  hybrid4 and hybrid5 -- even powers of mu plus double-pole terms
+- **Hybrid limb-darkening laws: closed forms and the fp64
+  reference** (`elome/hybrid.py`). The hybrid2, hybrid4 and hybrid5
+  laws -- even powers of mu plus double-pole terms
   1/(mu^2 + eps)^2, written in a shape basis whose weights w are each the
   share of the centre-to-limb drop a term carries -- as
   `flux_dev_hybrid(z, r, w, law)`, the shape-basis columns `shape_cols`
@@ -736,7 +735,7 @@ unnecessary.
 
   Measured: against a 30-digit direct integration, the pole columns agree
   to 1e-13 of their norm (1e-12 within 1e-6 of a contact, the geometry's
-  own conditioning), the laws to 1e-13; against SquishierPlanet's ellipse
+  own conditioning), the laws to 1e-13; against an independent ellipse
   code at a = b, 1e-12; the even columns match the cel3 route to 1e-14.
   Autodiff matches finite differences to 1e-7 in z, r and every weight;
   the analytic partials match autodiff to 1e-11 (except at MLX's max/min
@@ -744,7 +743,7 @@ unnecessary.
   analytic partials are the ones that match FD). fp32 stays within 1e-6
   of fp64 at every simplex vertex. 90 tests (`tests/test_hybrid.py`).
   Existing paths bitwise unchanged (296 arrays).
-- **Hybrid limb-darkening laws, stage 2 of 3: `TransitModel`.**
+- **Hybrid limb-darkening laws in `TransitModel`.**
   `limb_dark="hybrid2" | "hybrid4" | "hybrid5"` with `params.u` the shape
   weights (2, 4 or 5 of them), on every frontend path: `light_curve`,
   `light_curves` (sequence and array-valued, per-set weights), the
@@ -757,8 +756,8 @@ unnecessary.
   MLX graph (fp32 within 2e-6 of fp64), never the fused kernel, as the
   polynomial law does. 34 tests (`tests/test_hybrid_api.py`); existing
   paths bitwise unchanged (296 arrays).
-- **Hybrid limb-darkening laws, stage 3 of 3: fused fp32 kernels**
-  (`metalplanet/metal_hybrid.py`). `flux_dev_from_tau(..., limb_dark=,
+- **Hybrid limb-darkening laws: fused fp32 kernels**
+  (`elome/metal_hybrid.py`). `flux_dev_from_tau(..., limb_dark=,
   u=)` and `flux_dev_metal(..., limb_dark=, u=)` for all three laws:
   circular and eccentric orbits, every exposure rule, analytic VJPs in
   tau, the period, a, b, r, every weight (shared `(n_w,)` or per chain
@@ -1130,7 +1129,7 @@ unchanged for every valid input (296 arrays). 15 new tests; 727 green.
   have.** It reads the `TransitParams` fields as Python floats, so a
   gradient taken through it in a parameter is silently **zero**. The
   docstring now says so and points to `flux_dev_from_tau` and
-  `metalplanet.anvil`, and a test pins the behaviour so that a future fix
+  `elome.anvil`, and a test pins the behaviour so that a future fix
   must update the docs. (`TestDifferentiability.test_light_curve_mx_gradient`
   never exercised it: it differentiates a hand-built graph instead.)
 
@@ -1217,8 +1216,8 @@ unchanged for every valid input (296 arrays). 15 new tests; 727 green.
 
 ### Fixed
 - **`flux_dev_from_tau`'s graph path could not batch chains.** Reported by
-  turin, who hit it on the fp64 reference path and worked around it by
-  looping chain-by-chain (that workaround can go). With `n_chains > 1` and
+  a downstream sampler, which hit it on the fp64 reference path and worked
+  around it by looping chain-by-chain (that workaround can go). With `n_chains > 1` and
   `integration="contact"` or `"supersample"`, any parameter spelling --
   including scalars -- raised `[broadcast_shapes] Shapes (n,1) and
   (n,m,k) cannot be broadcast`. Each exposure rule appends a node axis to
@@ -1239,9 +1238,8 @@ unchanged for every valid input (296 arrays). 15 new tests; 727 green.
 
 ### Added
 - **`ld_basis=True` on `flux_dev_from_tau` (and `flux_dev_metal`)**: off by
-  default. Requested by SquishierPlanet
-  (`../SquishierPlanet/docs/upstream/metalplanet_ldbasis_prompt.md`),
-  whose collapsed-limb-darkening target treats (u1, u2) as a linear block.
+  default. Requested for collapsed limb darkening, which treats (u1, u2)
+  as a linear block.
   It returns the (n, m, 3) basis `B`, where `B[..., j]` is the
   exposure-integrated, unnormalised deficit for intensity mu^j. For any
   quadratic law, with c = (1 - u1 - u2, u1 + 2 u2, -u2) and
@@ -1268,9 +1266,8 @@ unchanged for every valid input (296 arrays). 15 new tests; 727 green.
   538 tests green.
 
 - **`flux_dev_from_tau`** — a `tau`-input entry point with the exposure
-  integration *inside* the kernel, requested by
-  [turin](../turin/docs/upstream/metalplanet_prompt.md) (Kepler/TESS
-  fitting with per-transit mid-times). Two gaps it closes. First, the
+  integration *inside* the kernel, requested for Kepler/TESS fitting with
+  per-transit mid-times. Two gaps it closes. First, the
   fused model kernel treats times as data and returns a zero gradient for
   them, so a sampler fitting TTVs — a mid-time per epoch, sampled jointly
   with the shape parameters — could not use it; here `tau` is an ordinary
@@ -1298,7 +1295,7 @@ unchanged for every valid input (296 arrays). 15 new tests; 727 green.
   period dependence into the split points that the kernel did not have —
   worth 9e-4 relative on `d/d(period)`, 2,000x the fp32 noise floor.
 - **`notebooks/02_joint_transit_and_gp.ipynb`** — fitting a transit and
-  correlated stellar variability *together*: MetalPlanet as anvil-gp's mean
+  correlated stellar variability *together*: Elómë as anvil-gp's mean
   model, a SHO Gaussian process over the residual, and anvil sampling all
   twelve parameters at once. The two packages compose with no adapter, because
   `make_quad_transit_flux` already returns exactly the `(v, x) -> (n_chains, m)`
@@ -1310,7 +1307,7 @@ unchanged for every valid input (296 arrays). 15 new tests; 727 green.
   transit-only posterior, is wrong here (128 is right), and *shrinking* the
   light curve to save time made convergence worse, because the GP
   hyperparameters lose their constraint.
-- **`notebooks/01_metalplanet_with_anvil.ipynb`** — a tutorial covering
+- **`notebooks/01_elome_with_anvil.ipynb`** — a tutorial covering
   forward modelling (orbits, limb-darkening laws, finite exposures, batched
   evaluation) and fitting real Kepler/TESS-style photometry end to end with
   anvil. Generated from `notebooks/build_01.py` so the prose and code stay
@@ -1370,7 +1367,7 @@ unchanged for every valid input (296 arrays). 15 new tests; 727 green.
   than three copies that had already drifted apart, and `_unbroadcast` is
   shared from `vjp.py` instead of duplicated in `kepler.py`.
 
-- `benchmarks/RESULTS.md` MetalPlanet single-curve rows re-measured on a
+- `benchmarks/RESULTS.md` Elómë single-curve rows re-measured on a
   quiet machine after the 0.6.0 unification (the circular frontend now
   runs on the fused kernel): fp32 0.74 → 0.42 ms at N = 1e5 and
   1.43 → 1.13 ms at 1e6; unchanged at 1e7 (host-copy-bound); 0.24 →
@@ -1523,7 +1520,7 @@ benchmark an eccentric half.
 
 ### Added
 - **Arbitrary-order polynomial limb darkening**, `limb_dark="polynomial"`
-  with `u = [u_1 ... u_N]` for any N (`metalplanet/poly.py`). ALFM19's
+  with `u = [u_1 ... u_N]` for any N (`elome/poly.py`). ALFM19's
   three-term M_n recursion seeded by closed forms for M_0..M_3, then
   s_n = -(2 r² M_n - n/(n+2)[(1-r²-z²) M_n + sqarea M_{n-2}]). Validated
   against a 40-digit mpmath direct integration sharing no code with it:
@@ -1536,7 +1533,7 @@ benchmark an eccentric half.
   coefficients stay **traced**: they can change between calls on a built
   model (the batman workflow) and the limb darkening is differentiable.
 - **Contact-split exposure integration**, `integration="contact"`
-  (`metalplanet/exposure.py`). The light curve's derivative jumps at each
+  (`elome/exposure.py`). The light curve's derivative jumps at each
   contact, so uniform supersampling converges only as O(1/N). Splitting
   the exposure window at the contacts and applying a fixed-order
   Gauss-Legendre rule to each smooth piece converges geometrically:
@@ -1549,7 +1546,7 @@ benchmark an eccentric half.
   node positions stay differentiable.
 - **Eccentric cross-code benchmarks**: `RESULTS.md` now compares all five
   codes at e = 0.3 on precision and orbit-inclusive speed, each solving
-  Kepler's equation itself. MetalPlanet fp64 is the most accurate
+  Kepler's equation itself. Elómë fp64 is the most accurate
   (4.4e-16, tied with exoplanet-core) and its fp32 GPU path the fastest
   past N ~ 1e5 (15.3 ms at 10^7 points vs 207 ms for the next code).
 
@@ -1560,7 +1557,7 @@ kernel with analytic gradients, and have their own anvil sampling
 target. Plan, gates and review log: `docs/v3eccentrickernel_plan.md`.
 
 ### Added
-- **Transit-anchored eccentric orbit** (`metalplanet/anchored.py`).
+- **Transit-anchored eccentric orbit** (`elome/anchored.py`).
   Solves for δ = E − E₀ about inferior conjunction rather than for E
   about periastron. Algebraically identical to the direct formulation
   (verified to 2.5e-15 in flux over an (e, w) grid including
@@ -1635,7 +1632,7 @@ target. Plan, gates and review log: `docs/v3eccentrickernel_plan.md`.
 ## [0.2.0] — 2026-09-06
 
 ### Added
-- **Fused Metal kernels** (`metalplanet/metal.py`): the fp32 GPU path
+- **Fused Metal kernels** (`elome/metal.py`): the fp32 GPU path
   runs the whole model in registers. v1: photometric core
   (z, r, u1, u2) → flux + analytic-VJP kernel; v2: model-level kernel
   consuming the anvil (v, x) contract with the orbit folded in.
@@ -1685,6 +1682,6 @@ with masked regimes and Taylor stability switches; Green's-basis flux
 assembly; analytic custom VJP; Kipping (2013) (q1,q2) limb darkening;
 epoch-centered circular orbit; batman-parity frontend
 (TransitParams/TransitModel incl. eccentric orbits, supersampling,
-secondary eclipses); anvil/applemcmc integration target; accurate fp64
+secondary eclipses); anvil integration target; accurate fp64
 sincos workaround for MLX's fp32-accurate fp64 trig; validation against
 batman, a Limbdark.jl port, and direct mpmath integration.

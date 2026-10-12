@@ -1,5 +1,5 @@
 """The data/dtype contract shared by every public function that takes z or
-tau (0.10.6-0.10.7).
+tau.
 
 * The data's dtype is the computation's. float32 stays float32 (the fused
   kernels on the GPU); anything else -- float64, float16, bfloat16,
@@ -89,7 +89,7 @@ def fp64_on_cpu(fn=None, *, any_arg: bool = False):
     transform machinery itself runs float64 ops on the default stream
     (verified: it raises even when the differentiated body runs wholly on
     the CPU stream), so that call must be made under
-    ``mx.stream(mx.cpu)`` by the caller, as the README says."""
+    ``mx.stream(mx.cpu)`` by the caller, as the docs say."""
     if fn is None:
         return lambda f: fp64_on_cpu(f, any_arg=any_arg)
     name = next(iter(inspect.signature(fn).parameters))

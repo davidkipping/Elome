@@ -1,4 +1,4 @@
-"""M5: analytic VJP — forward identical to Stage 1, gradients match the
+"""Analytic VJP — forward identical to the graph core, gradients match the
 autodiff oracle, NaN-free at boundaries."""
 
 import math

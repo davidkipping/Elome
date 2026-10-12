@@ -1,12 +1,11 @@
-"""anvil (formerly applemcmc) integration: the batched transit model and
+"""anvil integration: the batched transit model and
 a synthetic transit-fitting target.
 
 ``make_quad_transit_flux`` returns the engine-contract model function
     model_fn(v: (n_chains, 8), x: (2, m)) -> (n_chains, m) flux deviation
 and is pure elome (mlx + numpy only). ``make_target`` assembles the
 full sampling problem (chunked likelihood + transform + synthetic data);
-the engine is imported lazily — as ``anvil`` if available, falling back
-to its former name ``applemcmc`` — so the core package stays standalone.
+the engine is imported lazily, so the core package stays standalone.
 
 Model-space parameters v (all O(1), float32-safe offsets):
     0: t0_off  mid-transit offset from t0_ref [days]
@@ -46,33 +45,25 @@ PARAM_NAMES = ["t0_off", "p_off", "r", "b", "a", "q1", "q2", "df0"]
 
 
 def import_engine():
-    """Import the sampling engine under either of its names.
+    """Import the anvil sampling engine.
 
-    Returns (engine_module, ChunkedGaussianLogLike). Tries ``anvil``
-    first (the engine's new name), then ``applemcmc`` -- but only when no
-    ``anvil`` is installed at all: an ``anvil`` that is present and fails
-    to import (a missing dependency of its own, or an unrelated package
-    of the same name) re-raises that error instead of a misleading
-    "No module named 'applemcmc'".
+    Returns (engine_module, ChunkedGaussianLogLike). A missing engine
+    raises ImportError with the install command; an ``anvil`` that is
+    present but fails to import (a missing dependency of its own, or an
+    unrelated package of the same name) re-raises that error.
     """
     import importlib.util
-    if importlib.util.find_spec("anvil") is not None:
-        try:
-            import anvil as engine
-            from anvil.precision import ChunkedGaussianLogLike
-        except ImportError as err:
-            raise ImportError(
-                "an 'anvil' package is installed but is not the anvil MCMC "
-                f"engine, or failed to import: {err}") from err
-        return engine, ChunkedGaussianLogLike
+    if importlib.util.find_spec("anvil") is None:
+        raise ImportError(
+            "the anvil MCMC engine is not installed; install it with "
+            "`pip install git+https://github.com/davidkipping/anvil`")
     try:
-        import applemcmc as engine
-        from applemcmc.precision import ChunkedGaussianLogLike
+        import anvil as engine
+        from anvil.precision import ChunkedGaussianLogLike
     except ImportError as err:
         raise ImportError(
-            "the anvil MCMC engine is not installed (looked for 'anvil' and "
-            "its former name 'applemcmc'); install it with "
-            "`pip install git+https://github.com/davidkipping/anvil`") from err
+            "an 'anvil' package is installed but is not the anvil MCMC "
+            f"engine, or failed to import: {err}") from err
     return engine, ChunkedGaussianLogLike
 
 
@@ -89,7 +80,7 @@ def make_quad_transit_flux(period_ref: float, analytic_vjp: bool = True,
                    and CPU data generation ride the fallback);
       "analytic" — MLX graph forward + ALFM19 closed-form backward
                    ("graph" is an alias, as for make_ecc_transit_flux);
-      "autodiff" — pure reverse-mode autodiff (Stage 1 oracle).
+      "autodiff" — pure reverse-mode autodiff (the reference).
     analytic_vjp=False is a back-compat alias for core="autodiff"."""
     period_ref = float(period_ref)
     if not analytic_vjp:
@@ -150,11 +141,11 @@ def _build_graph_model(period_ref: float, core):
 
 @dataclass
 class QuadTransitTarget:
-    """Synthetic quadratic-LD transit-fitting problem (applemcmc-ready)."""
+    """Synthetic quadratic-LD transit-fitting problem (anvil-ready)."""
 
-    target: object                # applemcmc.TransformedLogDensity
-    transform: object             # applemcmc.Transform
-    loglike: object               # applemcmc.ChunkedGaussianLogLike
+    target: object                # anvil.TransformedLogDensity
+    transform: object             # anvil.Transform
+    loglike: object               # anvil.ChunkedGaussianLogLike
     truth_model: np.ndarray       # (8,) true params, model units
     t_ref: float
     t_model: np.ndarray
@@ -176,7 +167,7 @@ def make_target(
     float64 on the CPU; only per-orbit residuals, orbit numbers, and
     baseline-subtracted fluxes ever reach float32.
     """
-    applemcmc, ChunkedGaussianLogLike = import_engine()
+    engine, ChunkedGaussianLogLike = import_engine()
 
     rng = np.random.default_rng(seed)
 
@@ -219,20 +210,20 @@ def make_target(
     y_fit = y - 1.0
     yerr_arr = np.full(n_data, yerr)
 
-    transform = applemcmc.Transform([
-        applemcmc.ParamSpec("t0_off", lo=-0.5, hi=0.5,
+    transform = engine.Transform([
+        engine.ParamSpec("t0_off", lo=-0.5, hi=0.5,
                             report_offset=t_ref + t0_ref),
-        applemcmc.ParamSpec("p_off", lo=-0.05, hi=0.05,
+        engine.ParamSpec("p_off", lo=-0.05, hi=0.05,
                             report_offset=period_ref),
-        applemcmc.ParamSpec("r", lo=0.01, hi=0.5),
-        applemcmc.ParamSpec("b", lo=0.0, hi=0.9),
-        applemcmc.ParamSpec("a", lo=2.0, hi=50.0),
-        applemcmc.ParamSpec("q1", lo=0.0, hi=1.0),
-        applemcmc.ParamSpec("q2", lo=0.0, hi=1.0),
-        applemcmc.ParamSpec("df0", lo=-0.01, hi=0.01, report_offset=1.0),
+        engine.ParamSpec("r", lo=0.01, hi=0.5),
+        engine.ParamSpec("b", lo=0.0, hi=0.9),
+        engine.ParamSpec("a", lo=2.0, hi=50.0),
+        engine.ParamSpec("q1", lo=0.0, hi=1.0),
+        engine.ParamSpec("q2", lo=0.0, hi=1.0),
+        engine.ParamSpec("df0", lo=-0.01, hi=0.01, report_offset=1.0),
     ])
     loglike = ChunkedGaussianLogLike(model_fn, x64, y_fit, yerr_arr, policy)
-    target = applemcmc.TransformedLogDensity(
+    target = engine.TransformedLogDensity(
         loglike, transform, model_log_prob_hi=loglike.hi)
     return QuadTransitTarget(
         target=target, transform=transform, loglike=loglike,
@@ -265,8 +256,8 @@ class TransitTarget:
     mean function, say -- want to wrap the same model.
     """
 
-    target: object                # applemcmc.TransformedLogDensity
-    transform: object             # applemcmc.Transform
+    target: object                # anvil.TransformedLogDensity
+    transform: object             # anvil.Transform
     loglike: object               # ChunkedGaussianLogLike (maybe penalized)
     model_fn: object              # the batched (v, x) -> flux deviation
     x64: np.ndarray               # (2, n) epoch-centered times
@@ -332,11 +323,11 @@ def make_transit_target(t, y, yerr, t0_guess, period_guess,
             defaults cap r at 0.5, b at 1.2 and a at 200; an occultor
             larger than the star (a white-dwarf host) needs them widened,
             e.g. ``{"r": (1.0, 12.0), "b": (0.0, 13.0), "a": (1.5, 1000.0)}``.
-            The model takes any r > 0 (fp32 error grows ~ r^2; README,
-            "rp > 1").
+            The model takes any r > 0 (fp32 error grows ~ r^2; see the
+            docs on occultors larger than the star).
         strength: barrier weight for the eccentric constraints.
     """
-    applemcmc, ChunkedGaussianLogLike = import_engine()
+    engine, ChunkedGaussianLogLike = import_engine()
     t = np.asarray(t, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
     yerr = (np.full(t.size, float(yerr), dtype=np.float64)
@@ -371,8 +362,8 @@ def make_transit_target(t, y, yerr, t0_guess, period_guess,
                              f"{sorted(lims)}")
         lims[k] = v
     report = {"t0_off": t_ref + t0_ref, "p_off": period_ref, "df0": 1.0}
-    transform = applemcmc.Transform([
-        applemcmc.ParamSpec(n, lo=lims[n][0], hi=lims[n][1],
+    transform = engine.Transform([
+        engine.ParamSpec(n, lo=lims[n][0], hi=lims[n][1],
                             **({"report_offset": report[n]}
                                if n in report else {}))
         for n in names])
@@ -385,7 +376,7 @@ def make_transit_target(t, y, yerr, t0_guess, period_guess,
     if eccentric:
         loglike = PenalizedLogLike(
             loglike, lambda v: ecc_constraint_penalty(v, strength=strength))
-    target = applemcmc.TransformedLogDensity(
+    target = engine.TransformedLogDensity(
         loglike, transform, model_log_prob_hi=loglike.hi)
     return TransitTarget(
         target=target, transform=transform, loglike=loglike,
@@ -401,8 +392,8 @@ def make_transit_target(t, y, yerr, t0_guess, period_guess,
 PARAM_NAMES_ECC = ["t0_off", "p_off", "r", "b", "a", "q1", "q2",
                    "secosw", "sesinw", "df0"]
 
-#: numerical validity ceiling of the solve (docs/eccentric-kernel-notes.md:
-#: the Markley + one-refinement scheme holds |dE| <= 4.1e-7 at e = 0.999).
+#: numerical validity ceiling of the solve (the Markley + one-refinement
+#: scheme holds |dE| <= 4.1e-7 at e = 0.999).
 E_MAX_NUMERICAL = 0.999
 
 
@@ -608,7 +599,7 @@ def make_ecc_target(n_data: int = 100_000, baseline_days: float = 90.0,
                     core: str = "metal", ecc: float = 0.3,
                     omega_deg: float = 63.0) -> EccTransitTarget:
     """Injection-recovery problem for the 10-parameter eccentric model."""
-    applemcmc, ChunkedGaussianLogLike = import_engine()
+    engine, ChunkedGaussianLogLike = import_engine()
     rng = np.random.default_rng(seed)
 
     t_ref = 2_457_000.0
@@ -638,29 +629,29 @@ def make_ecc_target(n_data: int = 100_000, baseline_days: float = 90.0,
     y = 1.0 + dev_true + yerr * rng.standard_normal(n_data)
     y_fit = y - 1.0
 
-    policy = applemcmc.PrecisionPolicy()
-    transform = applemcmc.Transform([
-        applemcmc.ParamSpec("t0_off", lo=-0.5, hi=0.5,
+    policy = engine.PrecisionPolicy()
+    transform = engine.Transform([
+        engine.ParamSpec("t0_off", lo=-0.5, hi=0.5,
                             report_offset=t_ref + t0_ref),
-        applemcmc.ParamSpec("p_off", lo=-0.05, hi=0.05,
+        engine.ParamSpec("p_off", lo=-0.05, hi=0.05,
                             report_offset=period_ref),
-        applemcmc.ParamSpec("r", lo=0.01, hi=0.5),
-        applemcmc.ParamSpec("b", lo=0.0, hi=1.2),
-        applemcmc.ParamSpec("a", lo=2.0, hi=50.0),
-        applemcmc.ParamSpec("q1", lo=0.0, hi=1.0),
-        applemcmc.ParamSpec("q2", lo=0.0, hi=1.0),
+        engine.ParamSpec("r", lo=0.01, hi=0.5),
+        engine.ParamSpec("b", lo=0.0, hi=1.2),
+        engine.ParamSpec("a", lo=2.0, hi=50.0),
+        engine.ParamSpec("q1", lo=0.0, hi=1.0),
+        engine.ParamSpec("q2", lo=0.0, hi=1.0),
         # the (sqrt(e) cos w, sqrt(e) sin w) disc inscribed in its box;
         # e <= e_max(a, r) and |cos i| <= 1 are joint, so they are the
         # barrier's job, not the box's.
-        applemcmc.ParamSpec("secosw", lo=-0.95, hi=0.95),
-        applemcmc.ParamSpec("sesinw", lo=-0.95, hi=0.95),
-        applemcmc.ParamSpec("df0", lo=-0.01, hi=0.01, report_offset=1.0),
+        engine.ParamSpec("secosw", lo=-0.95, hi=0.95),
+        engine.ParamSpec("sesinw", lo=-0.95, hi=0.95),
+        engine.ParamSpec("df0", lo=-0.01, hi=0.01, report_offset=1.0),
     ])
     loglike = PenalizedLogLike(
         ChunkedGaussianLogLike(model_fn, x64, y_fit,
                                np.full(n_data, yerr), policy),
         ecc_constraint_penalty)
-    target = applemcmc.TransformedLogDensity(
+    target = engine.TransformedLogDensity(
         loglike, transform, model_log_prob_hi=loglike.hi)
     return EccTransitTarget(
         target=target, transform=transform, loglike=loglike,

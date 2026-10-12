@@ -2,9 +2,9 @@
 
 One kernel serves both: a circular orbit is e = 0, where the transit-
 anchored formulation is exact and a per-chain branch skips the Kepler
-solve. The compiled graph eccentric path (567 ms / 68.6 s at this size,
-benchmarks/v3_ecc_graph_baseline.py) is far too slow to be a useful
-denominator, so the numbers here are absolute.
+solve. The compiled graph eccentric path (567 ms / 68.6 s at this size)
+is far too slow to be a useful denominator, so the numbers here are
+absolute.
 """
 import math
 import time

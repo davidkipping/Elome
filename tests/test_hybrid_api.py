@@ -168,7 +168,7 @@ def test_fp32_light_curves_match_the_loop(law, mode):
 @pytest.mark.skipif(not metal_available(), reason="Metal unavailable")
 @pytest.mark.parametrize("mode", ["plain", "contact"])
 def test_a_cpu_stream_first_call_does_not_pin_the_graph(mode):
-    """The v0.9.2 trap does not apply to a z-kernel: its decision is made
+    """The CPU-stream-first-call trap does not apply to a z-kernel: its decision is made
     inside the trace, and mx.compile keeps one trace per stream, so the
     graph first traced on the CPU stream (hybrid.py's graph, the entry
     point never called) is retraced on the GPU with the kernel. One cache
@@ -189,7 +189,7 @@ def test_a_cpu_stream_first_call_does_not_pin_the_graph(mode):
 @pytest.mark.skipif(not metal_available(), reason="Metal unavailable")
 def test_float_radius_with_per_set_weights_takes_the_kernel_path():
     """_hybrid_dev's batched branch passes a Python-float radius to the
-    kernel as is (0.10.1 reshaped it unguarded; mx.reshape rejects
+    kernel as is (an earlier version reshaped it unguarded; mx.reshape rejects
     floats). Every frontend route casts rp to an array before _photom,
     so this guards the direct-call contract, not a frontend regression."""
     m = elome.TransitModel(params("hybrid5"), T, dtype=mx.float32)
@@ -207,7 +207,7 @@ def test_float_radius_with_per_set_weights_takes_the_kernel_path():
 @pytest.mark.skipif(not metal_available(), reason="Metal unavailable")
 def test_one_weight_row_broadcasts_on_the_kernel_route():
     """A (1, n_w) weight row with n > 1 rows of z: the kernel entry point
-    broadcasts it (0.10.3 reshaped it by the z row count and raised)."""
+    broadcasts it (an earlier version reshaped it by the z row count and raised)."""
     m = elome.TransitModel(params("hybrid4"), T, dtype=mx.float32)
     z = mx.array(np.linspace(0.5, 1.2, 8, dtype=np.float32)).reshape(2, 4)
     w1 = mx.array(np.array([WEIGHTS["hybrid4"]], np.float32))        # (1, 4)
@@ -224,7 +224,7 @@ def test_one_weight_row_broadcasts_on_the_kernel_route():
 @pytest.mark.parametrize("wshape", [(4,), (1, 4)])
 def test_one_set_on_1d_z_is_one_kernel_row(wshape):
     """A scalar radius with one set of weights on (m,) separations is one
-    (1, m) row of the kernel grid, not m single-point rows (0.10.4 sent a
+    (1, m) row of the kernel grid, not m single-point rows (an earlier version sent a
     (1, n_w) row down the batched branch with n = m)."""
     import elome.metal_hybrid as MH
     m = elome.TransitModel(params("hybrid4"), T, dtype=mx.float32)
@@ -256,7 +256,7 @@ def test_one_set_on_1d_z_is_one_kernel_row(wshape):
 def test_fp32_cpu_stream_fallback_is_the_graph_bitwise(law, mode):
     """An fp32 model with Metal on, run on the CPU stream, falls back to
     hybrid.py's graph -- the very graph use_metal=False runs -- not to
-    the kernel entry point's own fallback (0.10.2: 2.4e-7 apart). Both
+    the kernel entry point's own fallback (they once were 2.4e-7 apart). Both
     sides on the CPU stream: the same graph rounds differently on the two
     devices, and that is not what is under test."""
     p = params(law)
@@ -321,7 +321,7 @@ def test_array_eccentricity_route_uses_the_kernel_too():
 def test_contact_integration(law):
     """The contact rule needs nothing law-specific: n_gl = 7 agrees with
     n_gl = 40 (which is converged) to its own truncation, ~2e-8 on this
-    heavily smeared exposure (a sixth of T14; the README's quadratic
+    heavily smeared exposure (a sixth of T14; the documented quadratic
     figure is 9e-8 at n_gl = 5), and with a heavy supersampling to the
     latter's own O(1/N) accuracy."""
     def lc(**kw):
@@ -413,7 +413,7 @@ def test_secondary_eclipse_ignores_limb_darkening(law):
 
 
 def test_priors_feed_the_model():
-    """The README recipe: weights from the uniform prior maps."""
+    """The documented recipe: weights from the uniform prior maps."""
     rng = np.random.default_rng(3)
     w5 = ld.simplex_from_q_np(rng.random(5))
     w2 = ld.hybrid2_from_q_np(rng.random(), rng.random())
@@ -425,7 +425,7 @@ def test_priors_feed_the_model():
 
 
 # ---------------------------------------------------------------------------
-# custom laws: a HybridLaw object wherever a name goes (0.12.1)
+# custom laws: a HybridLaw object wherever a name goes
 # ---------------------------------------------------------------------------
 
 CUSTOM = {
@@ -493,8 +493,8 @@ def test_a_law_registered_after_import_is_supported():
 
 def test_a_name_and_its_law_object_are_one_law():
     """Built with "hybrid2", called with elome.HYBRID2 (and the
-    reverse): the same law, not "law changed" (0.12.1 compared raw
-    fields)."""
+    reverse): the same law, not "law changed" (an earlier version compared
+    raw fields)."""
     for build, call in (("hybrid2", elome.HYBRID2),
                         (elome.HYBRID2, "hybrid2")):
         p = params("hybrid2")
@@ -507,8 +507,8 @@ def test_a_name_and_its_law_object_are_one_law():
 
 def test_a_model_keeps_its_law_when_the_registry_changes():
     """The law is resolved once, at construction: re-binding or deleting
-    the name later cannot make one model trace two laws (0.12.1 re-read the
-    registry on every new graph)."""
+    the name later cannot make one model trace two laws (an earlier version re-read
+    the registry on every new graph)."""
     from elome import hybrid as Hm
     law = elome.HybridLaw("x", (0.2,), ((1.0, -1.0, 0.0),))
     Hm.LAWS["x"] = law

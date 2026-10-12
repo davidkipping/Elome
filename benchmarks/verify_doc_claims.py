@@ -1,6 +1,6 @@
-"""Reproduce the measured numbers quoted in docs/sampler-integration.md.
+"""Reproduce the measured batching and long-baseline numbers quoted in the docs.
 
-Writes doc_claims.json; every prose number in the guide traces here.
+Writes doc_claims.json; every such number in the docs traces here.
 Run on an otherwise-idle GPU.
 """
 

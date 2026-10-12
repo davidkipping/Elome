@@ -18,7 +18,7 @@ from elome.anvil import (PARAM_NAMES_ECC, ecc_constraint_penalty,
                                make_ecc_transit_flux)
 from elome.orbit import epoch_center_times
 
-applemcmc, _ = import_engine()
+engine, _ = import_engine()
 PREF = 3.456
 RNG = np.random.default_rng(4)
 
@@ -158,11 +158,11 @@ class TestTarget:
 
 
 # ---------------------------------------------------------------------------
-# v0.13.2 production review
+# production review: regressions
 # ---------------------------------------------------------------------------
 
 def test_penalty_gradient_finite_at_zero_eccentricity_in_fp32():
-    """Chains start at e = 0; 0.13.1 returned NaN d/d(secosw, sesinw) in
+    """Chains start at e = 0; an earlier version returned NaN d/d(secosw, sesinw) in
     fp32 there (the penalty re-derived e sin w through an unsafe branch)."""
     for e_comp in (0.0, 1e-12, 1e-6):
         v = mx.array([[0, 0, 0.1, 0.3, 8.8, 0.4, 0.3, e_comp, e_comp, 0]],
@@ -203,4 +203,13 @@ def test_import_engine_reports_a_broken_anvil(monkeypatch):
     for name in [k for k in sys.modules if k.startswith("anvil.")]:
         monkeypatch.delitem(sys.modules, name)
     with pytest.raises(ImportError, match="is not the anvil MCMC engine"):
+        import_engine()
+
+
+def test_import_engine_reports_a_missing_engine(monkeypatch):
+    import importlib.util
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec",
+                        lambda name, *a: None if name == "anvil" else real(name, *a))
+    with pytest.raises(ImportError, match="pip install git\\+https://github.com/davidkipping/anvil"):
         import_engine()

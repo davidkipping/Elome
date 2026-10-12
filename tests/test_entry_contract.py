@@ -1,8 +1,7 @@
-"""Every public entry point that takes z or tau, under every calling form
-(0.10.7).
+"""Every public entry point that takes z or tau, under every calling form.
 
-Six review rounds on the 0.10 frontend kept finding holes one calling
-form at a time -- a keyword data argument, a numpy float64 array, an fp64
+Review rounds on the frontend kept finding holes one calling form at a
+time -- a keyword data argument, a numpy float64 array, an fp64
 parameter, a Python-float coefficient under mx.grad. This file holds the
 whole matrix, so a change to a shared convention is checked against every
 entry point and every form at once:
@@ -69,7 +68,7 @@ KERNEL_ENTRIES = {
     "tau/hybrid_basis": (el.flux_dev_from_tau, "tau", TAU, GEO,
                          {"limb_dark": "hybrid4", "ld_basis": True}, "th"),
 }
-# Occultors larger than the star (0.11.0): a total occultation through
+# Occultors larger than the star: a total occultation through
 # every kernel family, so each calling form also runs the r > 1 branches.
 ZW = np.linspace(0.0, 9.0, 64)                      # total, partial, none
 GEO_WD = [("period", 1.4079), ("a", 336.0), ("b", 3.0), ("r", 7.28)]
@@ -199,7 +198,7 @@ def kernel_spy():
 @pytest.mark.parametrize("form", ["data-keyword", "all-keyword"])
 def test_call_forms_agree_bitwise(entry, form):
     """Data by keyword and all-keyword calls equal the positional call
-    (0.10.6's decorator took the data positionally only: z= raised)."""
+    (an earlier decorator took the data positionally only: z= raised)."""
     base = ALL[entry][2]
     d = mx.array(base, dtype=mx.float32)
     ref = _np(_call(entry, d))
@@ -309,7 +308,7 @@ def test_kernel_entries_cast_fp32_parameters_to_fp64_data(entry):
 def test_graph_entries_promote_as_mlx_does(entry, stream):
     """Graph functions keep MLX promotion: fp32 data with an fp64 radius
     is an fp64 result, on either stream (the call goes to the CPU stream
-    itself; it raised on the GPU before 0.10.7)."""
+    itself; it once raised on the GPU)."""
     d = mx.array(ALL[entry][2], dtype=mx.float32)
     ctx = mx.stream(mx.cpu) if stream == "cpu" else contextlib.nullcontext()
     with ctx:
@@ -367,8 +366,8 @@ def test_grad_fp32_on_the_default_stream_and_fp64_on_the_cpu_stream(entry):
     """d/dr in fp32 on the default stream, and in fp64 with the mx.grad
     call itself on the CPU stream (MLX's rule for a float64 input; see
     elome.dtypes). Both finite and in agreement; the fp64 route
-    with Python-float coefficients crashed flux_dev_analytic's backward
-    pass before 0.10.7."""
+    with Python-float coefficients once crashed flux_dev_analytic's
+    backward pass."""
     base = ALL[entry][2]
     g32 = mx.grad(_loss(entry, mx.array(base, dtype=mx.float32)))(
         mx.array(_r0(entry), dtype=mx.float32))

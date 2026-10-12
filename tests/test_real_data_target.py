@@ -20,7 +20,7 @@ from elome.anvil import (DEFAULT_BOUNDS, PenalizedLogLike,
                                make_transit_target)
 from elome.ld import u_to_q_np
 
-applemcmc, _ = import_engine()
+engine, _ = import_engine()
 T0, PER, RP, A, INC = 2500.123456, 4.2345, 0.085, 11.3, 88.6
 
 

@@ -1,17 +1,15 @@
-"""Oblate planets, Stage 1: the reference MLX graph (elome/oblate.py).
+"""Oblate planets: the reference MLX graph (elome/oblate.py).
 
-The truth is SquishierPlanet's analytic reference (numpy; importorskip) and
-its independent quadrature oracle; the contract is its brief's
-(docs/upstream/metalplanet_oblate_prompt.md there): <= 1e-12 of each
-column's unocculted flux in fp64 over its stress sets; f -> 0 continuous
-with the spherical path; the ld_basis identity; gradients against finite
-differences, finite everywhere.
+The truth is an independent polar-ray quadrature (tests/oblate_oracle.py,
+fp64 and 30-digit mpmath), itself checked against closed forms here. The
+contract: <= 1e-12 of each column's unocculted flux in fp64 over the
+topology classes and the limb- and pole-tangency stress sets; f -> 0
+continuous with the spherical path; the ld_basis identity; gradients
+against finite differences, finite everywhere.
 """
 
-import importlib.util
+import functools
 import math
-import sys
-from pathlib import Path
 
 import numpy as np
 import mlx.core as mx
@@ -19,24 +17,9 @@ import pytest
 
 import elome as el
 from elome import oblate as O
-from elome.hybrid import HYBRID2, HybridLaw, LAWS, hybrid_norms, shape_cols, w_to_c
+from elome.hybrid import HYBRID2, HybridLaw, LAWS, hybrid_norms, shape_cols
 
-_SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
-if _SP.is_dir() and str(_SP) not in sys.path:
-    sys.path.insert(0, str(_SP))
-try:
-    import squishierplanet as sp
-    from squishierplanet import laws as spl
-    from squishierplanet.assembly import basis_moments
-    from squishierplanet.oracle import occulted_flux
-    from squishierplanet.poles import pole_moments
-    _spec = importlib.util.spec_from_file_location("sp_conftest", _SP / "tests" / "conftest.py")
-    spc = importlib.util.module_from_spec(_spec)
-    _spec.loader.exec_module(spc)
-except Exception:                                           # optional cross-check
-    sp = None
-
-needs_sp = pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
+import oblate_oracle as OR
 
 EPS = tuple(sorted({e for name in ("hybrid2", "hybrid4", "hybrid5") for e in LAWS[name].eps}))
 ALLPOLES = HybridLaw("allpoles", EPS, ((1.0, -1.0, 0.0),))
@@ -69,43 +52,15 @@ def generators(x0, y0, r, f, dtype=mx.float64):
 
 
 def reference(x0, y0, A, B):
-    return -np.concatenate([basis_moments(x0, y0, A, B, 2),
-                            pole_moments(x0, y0, A, B, np.array(EPS))], -1)
+    return OR.columns(x0, y0, A, B, EPS)
 
 
-def canon(c):
-    """A configuration with its long axis along x (ours) from one with
-    either axis order (SquishierPlanet's generators)."""
-    x0, y0, a, b = c
-    return (x0, y0, a, b) if a >= b else (y0, -x0, b, a)
-
-
-def planets(C):
-    """Keep the planetary domain: A < 1, A^2/B <= 1, f in (0, 0.5]."""
-    x0, y0, A, B = C
-    m = (A < 1.0) & (A * A / B <= 1.0) & (B / A >= 0.5) & (B / A < 1.0 - 1e-9)
-    return x0[m], y0[m], A[m], B[m]
-
-
-def stress_sets():
-    sets = {}
-    for k, cls in enumerate(("two_int", "inside", "disjoint", "origin_in_partial")):
-        sets[cls] = [canon(c) for c in spc.make_configs(700 + k, cls, 150)]
-    lt = []
-    for gap in (0.0, 1e-12, 1e-9, 1e-6, 1e-3, -1e-9, -1e-6, -1e-3):
-        for kind in ("external", "internal"):
-            for a, b, ph in ((0.12, 0.08, 1.1), (0.05, 0.035, 2.0), (0.3, 0.2, 4.0)):
-                lt.append(canon(spc.tangent_config(a, b, ph, kind, gap)))
-    sets["limb_tangent"] = lt
-    pt = []
-    for e in EPS:
-        rho = math.sqrt(1.0 + e)
-        for gap in (0.0, 1e-14, 1e-12, 1e-10, 1e-8, 1e-6, -1e-12, -1e-9):
-            for a, b, ph in ((0.12, 0.08, 1.1), (0.3, 0.2, 2.5), (0.02, 0.014, 4.0)):
-                x0, y0, A, B = spc.tangent_config(a / rho, b / rho, ph, "internal", gap)
-                pt.append(canon((x0 * rho, y0 * rho, A * rho, B * rho)))
-    sets["pole_tangent"] = pt
-    return sets
+@functools.lru_cache(maxsize=None)
+def stress(name):
+    """(x0, y0, A, B, reference columns) of one stress set, in the
+    planetary domain."""
+    x0, y0, A, B = OR.planets(np.array(OR.stress_sets(EPS)[name]).T)
+    return x0, y0, A, B, reference(x0, y0, A, B)
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +69,7 @@ def stress_sets():
 
 def test_axes_and_domain():
     A, B = O.axes(0.1, 0.3)
-    Av, Bv = O.axes(0.1, np.array([0.1, 0.3]))        # numpy f (0.13.0 raised)
+    Av, Bv = O.axes(0.1, np.array([0.1, 0.3]))        # numpy f
     assert np.allclose(Av * Bv, 0.01, rtol=1e-15, atol=0)
     assert abs(A * B - 0.01) < 1e-17 and abs(B / A - 0.7) < 1e-15
     assert O.max_r_eff(0.5) == pytest.approx(0.5 ** 1.5)
@@ -125,86 +80,104 @@ def test_axes_and_domain():
             el.flux_dev_oblate(f64([0.5]), f64([0.0]), 0.1, bad_f, W["hybrid4"], "hybrid4")
 
 
-@needs_sp
-def test_principal_frame_is_squishierplanets():
-    from squishierplanet.model import to_principal
+def test_principal_frame_is_the_rotation_by_theta():
+    """theta is the sky angle of the long axis from X: the principal frame
+    rotates the sky by -theta."""
     rng = np.random.default_rng(0)
     X, Y, th = rng.normal(size=50), rng.normal(size=50), rng.uniform(0, np.pi, 50)
-    ours = O.principal_frame(X, Y, th)
-    ref = to_principal(X, Y, th)
-    assert np.allclose(ours, ref, atol=1e-15, rtol=0)
+    x0, y0 = O.principal_frame(X, Y, th)
+    assert np.allclose(x0, X * np.cos(th) + Y * np.sin(th), atol=1e-15, rtol=0)
+    assert np.allclose(y0, -X * np.sin(th) + Y * np.cos(th), atol=1e-15, rtol=0)
 
 
 # ---------------------------------------------------------------------------
-# against SquishierPlanet's analytic reference
+# the reference itself
 # ---------------------------------------------------------------------------
 
-@needs_sp
+def test_the_reference_meets_closed_forms():
+    """The quadrature against what is known exactly: a circle's lens area
+    (f = 0), an ellipse wholly on the disc (area pi A B, and the mu^2
+    moment pi A B (1 - x0^2 - y0^2 - (A^2 + B^2)/4)), a centred planet,
+    and its own 30-digit version."""
+    for d, r in ((0.0, 0.2), (0.5, 0.1), (0.95, 0.1), (1.0, 0.1), (1.05, 0.1), (0.3, 0.5)):
+        got = OR.columns(d, 0.0, r, r, ())[0, 0]
+        assert abs(got + OR.lens_area(d, r)) < 1e-14, (d, r)
+    for x0, y0, A, B in ((0.3, -0.2, 0.2, 0.12), (0.0, 0.0, 0.3, 0.15), (-0.5, 0.6, 0.1, 0.05)):
+        c = OR.columns(x0, y0, A, B, ())[0]
+        area = math.pi * A * B
+        assert abs(c[0] + area) < 1e-15
+        assert abs(c[1] + area * (1 - x0 * x0 - y0 * y0 - (A * A + B * B) / 4)) < 1e-15
+    for cfg in ((0.95, 0.1, 0.12, 0.09), (-0.4, 0.75, 0.2, 0.12), (0.0, 0.99, 0.15, 0.1)):
+        pytest.importorskip("mpmath")
+        eps = (EPS[0], EPS[-1])
+        norm = np.concatenate([NORM[:3], [NORM[3], NORM[-1]]])
+        err = np.abs(OR.columns_mp(*cfg, eps) - OR.columns(*cfg, eps)[0]) / norm
+        assert err.max() < 1e-14, cfg
+
+
+def test_the_reference_is_the_spherical_path_at_f_zero():
+    """A = B: the quadrature equals the spherical closed forms, whose own
+    truth is test_hybrid's 40-digit radial oracle."""
+    z = np.array([0.0, 0.3, 0.85, 0.95, 1.02, 1.08])
+    r = 0.1
+    ref = OR.columns(z, 0.0, r, r, EPS)
+    with mx.stream(mx.cpu):
+        sph = np.asarray(shape_cols(f64(z), f64(r), ALLPOLES))
+    # shape_cols is in the shape basis: [E0, 1 - mu^2, Pi_eps...]
+    E0, E1 = ref[:, 0], ref[:, 1]
+    assert np.abs(sph[:, 0] - E0).max() < 1e-14
+    assert np.abs(sph[:, 1] - (E0 - E1)).max() < 1e-14
+    for k, e in enumerate(EPS):                  # Pi_eps = (P_eps - p^-2 E0) / N_eps
+        Pi = (ref[:, 3 + k] - E0 / (1 + e) ** 2) / (e ** -2 - (1 + e) ** -2)
+        assert np.abs(sph[:, 2 + k] - Pi).max() < 1e-14 * max(1.0, 1 / e), e
+
+
+# ---------------------------------------------------------------------------
+# against the reference
+# ---------------------------------------------------------------------------
+
 @pytest.mark.parametrize("name", ["two_int", "inside", "disjoint", "origin_in_partial",
                                   "limb_tangent", "pole_tangent"])
 @pytest.mark.parametrize("dtype", [mx.float64, mx.float32], ids=["fp64", "fp32"])
-def test_generators_match_squishierplanet(name, dtype):
+def test_generators_match_the_reference(name, dtype):
     """Every generator column, every topology class and tangency set
     (planetary domain), to 1e-12 (fp64) / 1e-6 (fp32) of its unocculted
     flux."""
-    x0, y0, A, B = planets(np.array(stress_sets()[name]).T)
+    x0, y0, A, B, ref = stress(name)
     r, f = np.sqrt(A * B), 1.0 - B / A
     got = generators(x0, y0, r, f, dtype)
-    err = np.abs(got - reference(x0, y0, A, B)) / NORM
+    err = np.abs(got - ref) / NORM
     assert np.isfinite(got).all()
     assert err.max() < (1e-12 if dtype == mx.float64 else 1e-6)
 
 
-@needs_sp
 @pytest.mark.parametrize("law", ["hybrid2", "hybrid4", "hybrid5"])
-def test_law_light_curve_matches_squishierplanet(law):
-    """flux_dev_oblate along tilted transit chords vs squishierplanet.flux,
-    sky frame and theta convention included."""
-    L = spl.Law(*w_to_c(LAWS[law], W[law]), LAWS[law].eps)   # Elómë's poles
+def test_law_light_curve_matches_the_reference(law):
+    """flux_dev_oblate along tilted transit chords, sky frame and theta
+    convention included."""
     for r, f, th, b in ((0.1, 0.1, 0.4, 0.3), (0.2, 0.3, 1.0, 0.6), (0.05, 0.5, 2.5, 0.0)):
-        A, B = sp.axes_from_reff(r, f)
+        A, B = r / math.sqrt(1 - f), r * math.sqrt(1 - f)
         X = np.linspace(-(1 + A) * 1.02, (1 + A) * 1.02, 301)
         Y = np.full_like(X, b)
-        x0, y0 = O.principal_frame(X, Y, th)
+        x0, y0 = X * math.cos(th) + Y * math.sin(th), -X * math.sin(th) + Y * math.cos(th)
         got = cpu_np(lambda: el.flux_dev_oblate(f64(x0), f64(y0), r, f, W[law], law))
-        ref = sp.flux(L, X, Y, A, B, th) - 1.0
+        ref = OR.law_flux_dev(law, W[law], x0, y0, A, B)
+        assert ref.min() < -1e-3                            # a transit is tested
         assert np.abs(got - ref).max() < 1e-12, (r, f, th, b)
 
 
-@needs_sp
-def test_generators_match_the_quadrature_oracle():
-    """An independent check: SquishierPlanet's polar-ray quadrature."""
-    prims = [lambda rr, n=n: -(1.0 - rr * rr) ** (n + 1) / (2.0 * (n + 1)) for n in range(3)]
-    prims += [lambda rr, e=e: 1.0 / (2.0 * (1.0 - rr * rr + e)) for e in EPS]
-    cfg = [(0.95, 0.1, 0.12, 0.09), (-0.4, 0.75, 0.2, 0.12), (0.3, 0.2, 0.1, 0.08),
-           (0.0, 0.99, 0.15, 0.1), (0.7, -0.6, 0.05, 0.04)]
-    x0, y0, A, B = np.array(cfg).T
-    got = generators(x0, y0, np.sqrt(A * B), 1.0 - B / A)
-    for i, c in enumerate(cfg):
-        for k, prim in enumerate(prims):
-            ref = -occulted_flux(*c, prim)
-            assert abs(got[i, k] - ref) / NORM[k] < 1e-11, (c, k)
-
-
-@needs_sp
 def test_generators_match_mpmath_quadrature():
-    """Spot checks at 30 digits (mpmath.quad through the same oracle):
-    a partial and an inside configuration, the even column and the
-    innermost and outermost poles."""
+    """Spot checks at 30 digits: a partial and an inside configuration,
+    every column."""
     pytest.importorskip("mpmath")
-    cols = [(0, lambda rr: -(1.0 - rr * rr) / 2.0)]
-    for k in (0, len(EPS) - 1):
-        cols.append((3 + k, lambda rr, e=EPS[k]: 1.0 / (2.0 * (1.0 - rr * rr + e))))
     cfg = [(0.95, 0.1, 0.12, 0.09), (0.3, 0.2, 0.1, 0.08)]
     x0, y0, A, B = np.array(cfg).T
     got = generators(x0, y0, np.sqrt(A * B), 1.0 - B / A)
     for i, c in enumerate(cfg):
-        for k, prim in cols:
-            ref = -occulted_flux(*c, prim, use_mpmath=True)
-            assert abs(got[i, k] - ref) / NORM[k] < 1e-12, (c, k)
+        ref = OR.columns_mp(*c, EPS)
+        assert (np.abs(got[i] - ref) / NORM).max() < 1e-12, c
 
 
-@needs_sp
 @pytest.mark.parametrize("gap", [1e-3, 1e-6, 1e-9, -1e-9, -1e-6, -1e-3])
 def test_inside_and_partial_meet_at_the_limb(gap):
     """Where |centre| + A crosses 1 the inside closed forms hand over to the
@@ -293,7 +266,6 @@ def test_gradients_match_finite_differences(pt):
             assert abs(float(np.asarray(g[4])[j]) - fd) <= 1e-6 * max(abs(fd), 1e-3), j
 
 
-@needs_sp
 @pytest.mark.parametrize("dtype", [mx.float64,
                                    pytest.param(mx.float32, marks=pytest.mark.slow)],
                          ids=["fp64", "fp32"])
@@ -303,7 +275,7 @@ def test_gradients_finite_on_a_boundary_sweep(dtype):
     cfgs = []
     for gap in (0.0, 1e-9, -1e-9, 1e-6):
         for kind in ("external", "internal"):
-            x0, y0, a, b = canon(spc.tangent_config(0.12, 0.08, 1.1, kind, gap))
+            x0, y0, a, b = OR.tangent_config(0.12, 0.08, 1.1, kind, gap)
             cfgs.append((x0, y0, math.sqrt(a * b), 1 - b / a))
     sw = O._F_SW[dtype]
     cfgs += [(0.0, 0.0, 0.1, 0.2), (0.3, 0.0, 0.1, 0.0), (0.3, 0.0, 0.1, 0.99 * sw),

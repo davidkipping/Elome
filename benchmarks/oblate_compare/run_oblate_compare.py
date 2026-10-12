@@ -3,10 +3,13 @@
     benchmarks/oblate_compare/.venv/bin/python run_oblate_compare.py [--quick]
 
 Precision: every code on the scenario's 241-point grid against a 30-digit
-mpmath polar-ray integral (SquishierPlanet's oracle). Speed: each
-(code, mode, N) in its own subprocess (worker_oblate.py). Writes
-results_oblate.json; make_report_oblate.py renders RESULTS.md.
-Run on a quiet machine.
+mpmath polar-ray integral (tests/oblate_oracle.py, independent of every
+code under test). Speed: each (code, mode, N) in its own subprocess
+(worker_oblate.py). Writes results_oblate.json; make_report_oblate.py
+renders RESULTS.md. Run on a quiet machine.
+
+    --precision   precision only, into results_oblate.json
+    --graze       the same for BENCH_SCENARIO=graze (precision_graze)
 """
 import json
 import os
@@ -17,7 +20,7 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(HERE, "..", "..", "..", "SquishierPlanet"))
+sys.path.insert(0, os.path.join(HERE, "..", "..", "tests"))   # oblate_oracle
 
 import numpy as np  # noqa: E402
 
@@ -27,16 +30,16 @@ from scenario_oblate import (A_AX, B_AX, BATCH_NPT, BATCH_NPV, GRAD_N,  # noqa: 
 
 
 def oracle_flux():
-    from squishierplanet.oracle import occulted_flux
+    """I(mu) = 1 - w (1 - mu^2) = (1 - w) mu^0 + w mu^2, at 30 digits."""
+    import oblate_oracle as OR
     w = W_LD
-
-    def prim(rr):
-        return (1 - w) * (-(1 - rr * rr) / 2) + w * (-(1 - rr * rr) ** 2 / 4)
-    total = np.pi * (1 - w / 2)
+    total = np.pi * (1 - w) + w * np.pi / 2
     x0, y0 = principal(time_grid(N_PREC))
-    occ = np.array([occulted_flux(x, y, A_AX, B_AX, prim, use_mpmath=True, dps=30)
-                    for x, y in zip(x0, y0)])
-    return 1.0 - occ / total
+    dev = []
+    for x, y in zip(x0, y0):
+        c = OR.columns_mp(x, y, A_AX, B_AX, (), dps=30)   # negative deviations
+        dev.append(((1 - w) * c[0] + w * c[1]) / total)
+    return 1.0 + np.array(dev)
 
 
 def precision():
@@ -60,9 +63,10 @@ def measure(code, mode, n):
 
 
 def main():
-    if "--graze" in sys.argv:
-        # precision only, the stress scenario (scenario_oblate.GRAZE)
-        res = {"precision_graze": precision()}
+    if "--graze" in sys.argv or "--precision" in sys.argv:
+        # precision only; --graze is the stress scenario (scenario_oblate.GRAZE)
+        key = "precision_graze" if "--graze" in sys.argv else "precision"
+        res = {key: precision()}
         path = os.path.join(HERE, "results_oblate.json")
         old = json.load(open(path)) if os.path.exists(path) else {}
         old.update(res)

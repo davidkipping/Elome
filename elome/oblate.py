@@ -1,5 +1,5 @@
 """Oblate (elliptical) planets for the hybrid limb-darkening laws -- the
-reference MLX graph, fp64 and fp32 (Stage 1 of docs/oblate-plan.md).
+reference MLX graph, fp64 and fp32.
 
 A planet of projected area-equivalent radius r and flattening f is an
 ellipse with semi-axes A = r / sqrt(1 - f) (long) and B = A (1 - f), so
@@ -7,8 +7,8 @@ A B = r^2. Its centre, in the ellipse's principal frame, is (x0, y0)
 (``principal_frame`` maps a sky position to it). The occulted flux of a
 radial intensity I(rho^2) follows from Green's theorem with the potential
 h(s) = (1/2s) int_0^s I, as a contour integral over the ellipse arc inside
-the star plus h(1) times the star's limb arc inside the ellipse
-(SquishierPlanet, docs/notes; reference ``squishierplanet.jaxlc``).
+the star plus h(1) times the star's limb arc inside the ellipse (the
+hybrid-law paper, in preparation).
 
 Generator columns, as for the spherical path (``hybrid.py``), in deviation
 form (minus the occulted flux; exactly 0 out of transit):
@@ -20,7 +20,7 @@ form (minus the occulted flux; exactly 0 out of transit):
   + S2, p = 1 + eps, with logs continued along the arc; a near-double pair
   of roots is integrated as one quadratic factor (sigma, pi).
 
-Three regimes, as masks (docs/oblate-plan.md, "Cost review"):
+Three regimes, as masks:
 
 * outside -- zero;
 * inside (the ellipse wholly on the disc) -- the contour is the whole
@@ -66,7 +66,7 @@ _PI = math.pi
 _TWO_PI = 2.0 * math.pi
 _sg = mx.stop_gradient
 
-# per-precision tolerances (fp64 as the reference; fp32 from Stage 0)
+# per-precision tolerances (fp64 as the reference)
 _F_SW = {mx.float64: 1e-10, mx.float32: 1e-5}      # spherical below this f
 _Z_TOL = {mx.float64: 1e-4, mx.float32: 3e-3}      # |z| ~ 1 crossing candidate
 _G_TOL = {mx.float64: 1e-12, mx.float32: 1e-5}     # crossing residual, relative
@@ -254,12 +254,13 @@ def _roots(S0, S1, S2, p):
 # --------------------------------------------------------------------------
 #
 # Written out in elementwise operations on (re, im) pairs, so that it runs
-# per lane on any stream and in either precision, and so that the Stage 3
-# Metal kernels can transcribe it line for line (Metal has no eigensolver).
+# per lane on any stream and in either precision, and so that the Metal
+# kernels (metal_oblate.py) transcribe it line for line (Metal has no
+# eigensolver).
 # The companion matrix is already upper Hessenberg. Branch-free: a fixed
 # number of sweeps per deflation stage, then the trailing eigenvalue is
 # read off and the active block shrinks; the last 2x2 is solved directly.
-# Measured on the Stage 1 stress sets, (5, 4) sweeps already match
+# Measured on the oblate test stress sets, (5, 4) sweeps already match
 # (12, 8); the counts below keep a margin. A sweep that has converged is
 # harmless to repeat (the shift then equals the eigenvalue).
 
@@ -440,7 +441,7 @@ def _arcs(x0, y0, a, b, phi_a, phi_b):
 
 def _corner(x0, y0, a, b, lo, hi):
     """Gradient-only corner term C(P_lo) - C(P_hi), value 0: the net effect
-    of the frozen endpoints' motion (squishierplanet.jaxlc._corner)."""
+    of the frozen endpoints' motion."""
     def C(phi):
         s, c = sincos(phi)
         xp, yp = _sg(x0) + _sg(a) * c, _sg(y0) + _sg(b) * s
@@ -465,7 +466,7 @@ def _alpha(n_max):
 
 def _q_coeffs(S0, S1, S2, K0, K1, n_max):
     """q[n][m], m = 0..2 n_max + 1: h_n(s) K = Re sum_m q_m e^{i m phi}
-    (positive frequencies; squishierplanet.jaxlc._q_coeffs)."""
+    (positive frequencies)."""
     H = 2 * n_max + 1
     W = 2 * H + 1
     zero = _C(0.0 * S0, 0.0 * S0)
@@ -583,7 +584,7 @@ def _J(u, Delta):
 
 def _bairstow(dc, sig0, pi0):
     """One Newton step on the remainder of D mod (z^2 - sigma z + pi);
-    (sig0, pi0) frozen, dc = (d0..d4) live (squishierplanet.jaxlc._bairstow)."""
+    (sig0, pi0) frozen, dc = (d0..d4) live."""
     zero = _C(0.0 * sig0.re, 0.0 * sig0.re)
     al, be = zero, zero + 1.0
     das = dbs = dap = dbp = zero
@@ -606,7 +607,7 @@ def _bairstow(dc, sig0, pi0):
 
 def _pole_arc(S0, S1, S2, K0, K1, p, z0, lo, hi):
     """(1/2p) Re of the ellipse-arc contour integral over [lo, hi]
-    (squishierplanet.jaxlc._pole_ellipse, one arc)."""
+    (one arc)."""
     w1, w2 = _expi(lo), _expi(hi)
     zst = _stack(z0)
     inner0 = [zf.abs() < 1.0 for zf in z0]

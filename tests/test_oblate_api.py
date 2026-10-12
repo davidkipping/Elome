@@ -1,16 +1,15 @@
-"""Oblate planets, Stage 4: TransitParams.f / .theta through TransitModel.
+"""Oblate planets: TransitParams.f / .theta through TransitModel.
 
 The model forms time since each point's own mid-transit and calls
 flux_dev_from_tau(f=, theta=) (the oblate kernels on an fp32 GPU model,
-the exact graph otherwise), with its own exposure rule. Pinned against
-SquishierPlanet's model.light_curve in absolute times, against the
-spherical model at f = 0, across precisions and surfaces, and in its
+the exact graph otherwise), with its own exposure rule. Pinned against an
+independent reference (a numpy orbit and a polar-ray quadrature,
+tests/oblate_oracle.py) in absolute times, against the spherical model at
+f = 0, across precisions and surfaces, and in its
 gradients.
 """
 
 import math
-import sys
-from pathlib import Path
 
 import numpy as np
 import mlx.core as mx
@@ -19,15 +18,8 @@ import pytest
 import elome as el
 from elome import metal as M
 
-_SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
-if _SP.is_dir() and str(_SP) not in sys.path:
-    sys.path.insert(0, str(_SP))
-try:
-    from squishierplanet import laws as spl
-    from squishierplanet.model import light_curve as sp_light_curve
-except Exception:
-    spl = None
-needs_sp = pytest.mark.skipif(spl is None, reason="squishierplanet not importable")
+import oblate_oracle as OR
+
 KERNEL = M.metal_available() and M._gpu_stream_active()
 
 W5 = [0.2, 0.2, 0.1, 0.1, 0.1]
@@ -52,14 +44,19 @@ def spherical(**kw):
     return p
 
 
-@needs_sp
 @pytest.mark.parametrize("ecc,w", [(0.0, 90.0), (0.3, 40.0), (0.6, -70.0)])
-def test_matches_squishierplanet(ecc, w):
+def test_matches_the_reference(ecc, w):
+    """Absolute times, t0 the time of inferior conjunction, inc and w in
+    degrees, theta in degrees."""
     p = P(ecc=ecc, w=w)
     got = el.TransitModel(p, T).light_curve(p)
-    ref = sp_light_curve(T, spl.hybrid("hybrid5", W5), r_eff=0.1, f=0.3,
-                         theta=math.radians(35.0), period=PER, a=8.8,
-                         i=math.radians(88.0), t0=T0, e=ecc, omega=math.radians(w))
+    X, Y, front = OR.sky_position(T - T0, PER, 8.8, math.radians(88.0), ecc, math.radians(w))
+    th = math.radians(35.0)
+    x0, y0 = X * math.cos(th) + Y * math.sin(th), -X * math.sin(th) + Y * math.cos(th)
+    A = 0.1 / math.sqrt(0.7)
+    ref = np.ones(len(T))
+    near = front & (np.hypot(x0, y0) < 1 + A)
+    ref[near] += OR.law_flux_dev("hybrid5", W5, x0[near], y0[near], A, 0.7 * A)
     assert 1.0 - ref.min() > 1e-3
     assert np.abs(got - ref).max() < 1e-13
 
@@ -190,8 +187,8 @@ def test_out_of_domain_array_is_nan():
 
 
 def test_spherical_models_unchanged_by_the_new_fields():
-    """A TransitParams built before 0.13 (no f / theta attributes) still
-    works, and a spherical model's batch keys are what they were."""
+    """A TransitParams without f / theta attributes still works, and a
+    spherical model's batch keys are the spherical ones."""
     p = spherical()
     del p.f, p.theta
     m = el.TransitModel(p, T)
@@ -201,7 +198,7 @@ def test_spherical_models_unchanged_by_the_new_fields():
 
 
 # ---------------------------------------------------------------------------
-# v0.13.1 review fixes
+# review fixes: regressions
 # ---------------------------------------------------------------------------
 
 def _one_sided_fd_ecc(m, w, h=1e-6):
@@ -214,8 +211,8 @@ def _one_sided_fd_ecc(m, w, h=1e-6):
 
 @pytest.mark.parametrize("dtype", [mx.float64, mx.float32], ids=["fp64", "fp32"])
 def test_array_ecc_gradient_at_zero_is_the_one_sided_derivative(dtype):
-    """An array ecc enters as (e, w), exact at e = 0 (0.13.0 went through
-    sqrt(e) and returned -0.06 against the true +1.02 here)."""
+    """An array ecc enters as (e, w), exact at e = 0 (going through
+    sqrt(e) and would return -0.06 against the true +1.02 here)."""
     with mx.stream(mx.cpu):
         ref = _one_sided_fd_ecc(el.TransitModel(P(w=40.0), T), 40.0)
     stream = mx.cpu if dtype == mx.float64 else mx.gpu

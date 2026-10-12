@@ -1,0 +1,4 @@
+/* the Tengwar logo is wide and short: keep it modest beside the title */
+.navbar-brand img { max-height: 2.2rem; }
+/* tables of numbers read better right-aligned and compact */
+table.docutils td, table.docutils th { padding: 0.25rem 0.6rem; }

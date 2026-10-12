@@ -1,7 +1,7 @@
-"""The sampler-integration guide's emcee recipe must actually work:
+"""The documented emcee recipe must actually work:
 half-ensemble batching, priors rejecting unphysical proposals, compiled
 chunked likelihood, finite chains. Small-scale smoke of the exact
-pattern documented in docs/sampler-integration.md."""
+documented pattern."""
 
 import numpy as np
 import mlx.core as mx

@@ -1,17 +1,15 @@
-"""Oblate planets, Stage 3: the fp32 Metal kernels (metal_oblate.py).
+"""Oblate planets: the fp32 Metal kernels (metal_oblate.py).
 
 The truth is the fp64 graph (oblate.py / oblate_tau.py), itself pinned to
-SquishierPlanet by Stages 1 and 2. Here: the device functions point by
-point on SquishierPlanet's stress sets (columns and the dual-number
-gradient); the tau kernels against the fp64 graph under every rule, orbit
+an independent quadrature (test_oblate.py, test_oblate_tau.py). Here: the
+device functions point by point on the oblate stress sets (columns and
+the dual-number gradient); the tau kernels against the fp64 graph under every rule, orbit
 and law, scalar and basis; the hand-assembled VJP against fp64 autodiff in
 every input; the documented d/df = 0 below the fp32 switch; per-chain
 independence; a no-NaN sweep; and the kernel routing.
 """
 
 import math
-import sys
-from pathlib import Path
 
 import numpy as np
 import mlx.core as mx
@@ -23,19 +21,11 @@ from elome import metal_oblate as MO
 from elome import oblate as O
 from elome.hybrid import LAWS, hybrid_norms
 
+import oblate_oracle as OR
+
 pytestmark = pytest.mark.skipif(
     not (M.metal_available() and M._gpu_stream_active()),
     reason="the oblate kernels need Metal and the GPU stream")
-
-_SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
-try:
-    import importlib.util
-    _spec = importlib.util.spec_from_file_location("sp_conftest", _SP / "tests" / "conftest.py")
-    spc = importlib.util.module_from_spec(_spec)
-    _spec.loader.exec_module(spc)
-except Exception:
-    spc = None
-needs_sp = pytest.mark.skipif(spc is None, reason="squishierplanet not importable")
 
 P, A_RS = 3.45, 8.8
 EXP = 1800.0 / 86400.0
@@ -45,27 +35,22 @@ TAU = np.linspace(-0.13, 0.13, 257)
 F_SW = MO._F_SW32
 
 
-def canon(c):
-    x0, y0, a, b = c
-    return (x0, y0, a, b) if a >= b else (y0, -x0, b, a)
-
-
 def stress(law):
-    """SquishierPlanet's classes, limb and pole tangencies, plus random
+    """The topology classes, limb and pole tangencies, plus random
     f in [f_sw, 0.5]; in the planetary domain. (x0, y0, A, B) rows."""
     cfg = []
     for k, cls in enumerate(("two_int", "inside", "disjoint", "origin_in_partial")):
-        cfg += [canon(c) for c in spc.make_configs(700 + k, cls, 100)]
+        cfg += OR.make_configs(700 + k, cls, 100)
     for gap in (0.0, 1e-9, 1e-6, 1e-3, -1e-9, -1e-6, -1e-3):
         for kind in ("external", "internal"):
             for a, b, ph in ((0.12, 0.08, 1.1), (0.3, 0.2, 4.0), (0.2, 0.19, 0.5)):
-                cfg.append(canon(spc.tangent_config(a, b, ph, kind, gap)))
+                cfg.append(OR.tangent_config(a, b, ph, kind, gap))
     for e in LAWS[law].eps:
         rho = math.sqrt(1.0 + e)
         for gap in (0.0, 1e-12, 1e-9, 1e-6, -1e-9):
             for a, b, ph in ((0.12, 0.08, 1.1), (0.3, 0.2, 2.5), (0.02, 0.014, 4.0)):
-                x0, y0, A, B = spc.tangent_config(a / rho, b / rho, ph, "internal", gap)
-                cfg.append(canon((x0 * rho, y0 * rho, A * rho, B * rho)))
+                x0, y0, A, B = OR.tangent_config(a / rho, b / rho, ph, "internal", gap)
+                cfg.append((x0 * rho, y0 * rho, A * rho, B * rho))
     rng = np.random.default_rng(3)
     for _ in range(200):
         f = 10 ** rng.uniform(math.log10(2 * F_SW), math.log10(0.5))
@@ -98,7 +83,6 @@ def graph_cols(X, Y, r, f, th, law, wct=None):
 # the device functions, point by point
 # ---------------------------------------------------------------------------
 
-@needs_sp
 @pytest.mark.parametrize("law", ["hybrid2", "hybrid4", "hybrid5"])
 def test_device_columns_match_the_fp64_graph(law):
     x0, y0, A, B = stress(law)
@@ -113,7 +97,6 @@ def test_device_columns_match_the_fp64_graph(law):
     assert (np.abs(Bk - Bg) / hybrid_norms(law)).max() < 1.5e-6
 
 
-@needs_sp
 @pytest.mark.parametrize("law", ["hybrid2", "hybrid5"])
 def test_device_gradient_matches_fp64_autodiff(law):
     """The dual-number Jacobian, contracted with a random cotangent, in
@@ -352,7 +335,7 @@ def test_contact_kernel_matches_the_fp64_graph(orbit):
 
 
 def test_contacts_are_solved_only_for_the_contact_rule():
-    """The other rules never read them (0.13.0 solved them every call)."""
+    """The other rules never read them (they were once solved every call)."""
     seen = []
     orig = MO.contact_offsets_oblate_kernel
 

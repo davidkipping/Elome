@@ -1,9 +1,8 @@
-"""Is ChEES's max_leapfrog cap of 24 still right?
+"""How long should ChEES's trajectories be? (its max_leapfrog cap)
 
-The cap was set when an unbounded adaptation drove trajectories to ~128
-steps at ~1.2 s per gradient. Gradients now cost 55-76 ms, so the cap is
-re-measured here on ESS/s (and R-hat, and divergences) rather than
-assumed. The answer is target-dependent -- see docs/sampler-integration.md.
+The cap is measured here on ESS/s (and R-hat, and divergences) for the
+circular and eccentric targets. The answer is target-dependent -- see
+the docs' "Fitting a spherical planet".
 
 Note on interpretation: ESS cannot exceed n_chains x n_samples, so at
 high caps the circular run approaches that ceiling and ESS/s must

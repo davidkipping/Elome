@@ -3,8 +3,7 @@ Silicon (MLX).
 
 The name is Quenya: él "star" + lómë "dusk, dimness" -- a star dimmed,
 which is what a transit is. Pronounced /ɛˈloː.mɛ/, "eh-LOH-meh", stressed
-on the long ó, the final ë spoken. Formerly MetalPlanet (``import
-metalplanet`` is a deprecated alias).
+on the long ó, the final ë spoken.
 
 Quadratic limb-darkened transits per Agol, Luger & Foreman-Mackey (2020),
 with a batman-style frontend for everyday use:
@@ -16,7 +15,7 @@ with a batman-style frontend for everyday use:
     flux = m.light_curve(params)
 
 and a float32-conditioned batched backend (``elome.anvil``) for
-GPU sampling with the anvil (formerly applemcmc) MCMC engine — which is
+GPU sampling with the anvil MCMC engine — which is
 an optional integration dependency; the core needs only mlx and numpy.
 """
 
@@ -88,4 +87,4 @@ __all__ = [
     "sn_dev_with_aux",
 ]
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"

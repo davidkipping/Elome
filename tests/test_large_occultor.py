@@ -1,4 +1,4 @@
-"""Occultors larger than the star: Rp/R* > 1 (0.11.0; white-dwarf hosts).
+"""Occultors larger than the star: Rp/R* > 1 (white-dwarf hosts).
 
 Four regimes for r > 1: none (z >= 1 + r), partial, and total occultation
 (z <= r - 1), where the disc is fully covered and every term takes its
@@ -6,8 +6,6 @@ full-disk value with zero gradients. The reference is an mpmath integral
 of the occulted intensity over circles about the star's centre -- the arc
 inside the occultor, or the whole circle when x + z <= r -- i.e.
 test_poly._oracle generalised to any radial law.
-
-See docs/large-occultor-plan.md for the measured baseline this pins.
 """
 
 import functools
@@ -203,8 +201,8 @@ def test_total_occultation_is_exact_on_the_graph(r):
 @pytest.mark.skipif(not KERNEL, reason="Metal unavailable")
 @pytest.mark.parametrize("r", (1.001, 1.2, 7.28, 50.0))
 def test_total_occultation_is_exact_in_the_kernels(r):
-    """Every fp32 kernel family: -1 exactly (NaN at z = 0 and errors up to
-    17 before 0.11.0), the basis at minus the full-disk fluxes, and zero
+    """Every fp32 kernel family: -1 exactly (where there were once NaN at z = 0
+    and errors up to 17), the basis at minus the full-disk fluxes, and zero
     gradients from the analytic VJPs."""
     z = f32(_total_z(r)[:-1])                  # strictly inside, fp32
     assert np.array_equal(kernel32(z, r, "quadratic"), -np.ones(z.size))
@@ -250,8 +248,8 @@ def _params(r, b, ecc=0.0, law="quadratic"):
 @pytest.mark.parametrize("dtype", (None, mx.float32), ids=("fp64", "fp32"))
 @pytest.mark.parametrize("law", ("quadratic", "hybrid4"))
 def test_no_eclipse_at_the_far_conjunction(b, ecc, dtype, law):
-    """Away from transit the flux is exactly 1. Before 0.11.0 the far-side
-    push 2 + z did not clear an occultor with r > 1: b < r - 1 got a full
+    """Away from transit the flux is exactly 1. A far-side push of
+    2 + z would not clear an occultor with r > 1: b < r - 1 would get a full
     eclipse at the far conjunction on the fp64 graph."""
     if dtype is mx.float32 and not KERNEL:
         pytest.skip("Metal unavailable")
@@ -405,7 +403,7 @@ def test_kernel_vjp_matches_fp64_autodiff(b):
 @pytest.mark.parametrize("r", (1 - 1e-7, 1.0, 1 + 1e-7, 1 + 1e-3))
 def test_r_near_one_is_finite_and_accurate(r):
     """r == 1 is degenerate (the contacts meet at z = 0): 5e-9 in fp64,
-    1e-4 in fp32, as before 0.11.0; finite everywhere."""
+    1e-4 in fp32; finite everywhere."""
     zs = [0.0, 1e-8, 1e-4, 1e-3, 0.3, 1.0, 1.9]
     ref = np.array([oracle(z, r, "quadratic") for z in zs])
     got = graph64(zs, r, "quadratic")
@@ -417,10 +415,10 @@ def test_r_near_one_is_finite_and_accurate(r):
 
 @pytest.mark.parametrize("law", list(W))
 def test_hybrid_internal_contact_is_finite_in_fp32(law):
-    """Where z + r rounds to exactly 1 in fp32 the lens depth -Bp was -0.0:
-    the pole's ratio flipped to -inf and the lane took sqrt(-Q) -> NaN, in
-    every column (generator mixing) -- about 1 point in 10 within two ulps
-    of the internal contact, graph and kernel alike (v0.10.x)."""
+    """Where z + r rounds to exactly 1 in fp32 the lens depth -Bp is -0.0:
+    unguarded, the pole's ratio flips to -inf and the lane takes
+    sqrt(-Q) -> NaN, in every column (generator mixing) -- about 1 point in
+    10 within two ulps of the internal contact, graph and kernel alike."""
     rs = np.linspace(0.05, 0.95, 91).astype(np.float32)
     zs, rr = [], []
     for r in rs:
@@ -466,7 +464,7 @@ def test_white_dwarf_end_to_end(b):
 
 @pytest.mark.parametrize("b", (7.79, 3.0), ids=("grazing", "total"))
 def test_anvil_target_samples_large_occultors(b):
-    """make_transit_target with widened bounds (README): finite density and
+    """make_transit_target with widened bounds (as documented): finite density and
     gradient at r > 1, and the truth scores highest."""
     A = pytest.importorskip("elome.anvil")
     p = _params(7.28, b)

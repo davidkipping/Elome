@@ -6,14 +6,10 @@ Ground truth is a 30-digit mpmath direct integration
     F - 1 = -[int I(x) alpha(x, z, r) x dx] / [2 pi int I(x) x dx]
 
 (alpha the angle of the disc annulus at radius x inside the planet), which
-shares no code with the closed forms. SquishierPlanet's ellipse code at
-a = b, an independent route (Green/Fourier/quartic), is a second oracle
-when it is importable from the sibling checkout.
+shares no code with the closed forms.
 """
 
 import math
-import sys
-from pathlib import Path
 
 import numpy as np
 import mlx.core as mx
@@ -30,15 +26,6 @@ from elome.vjp import ld_basis_analytic
 
 mp = pytest.importorskip("mpmath")
 mp.mp.dps = 30
-
-_SP = Path(__file__).resolve().parents[2] / "SquishierPlanet"
-if _SP.is_dir() and str(_SP) not in sys.path:
-    sys.path.insert(0, str(_SP))
-try:
-    import squishierplanet as sp
-    from squishierplanet.laws import Law as SPLaw
-except Exception:                                     # optional cross-check
-    sp = None
 
 from hybrid_weights import phys_w as _phys_w, vertex_weight  # noqa: E402
 
@@ -63,18 +50,6 @@ def phys_w(law, seed):
     """A weight vector inside the physical region (triangle / simplex),
     chosen by the law's structure (hybrid_weights)."""
     return _phys_w(law, np.random.default_rng(seed))
-
-
-def sp_same(name):
-    """Does the SquishierPlanet checkout carry Elómë's poles for this law?
-    (Its law is then the same; a checkout with other poles cannot be
-    compared on it.)"""
-    from squishierplanet import laws as spl
-    if name == "hybrid2":
-        return float(spl.HYBRID2_EPS) == H.HYBRID2_EPS
-    law = LAWS[name]
-    ref = spl.hybrid(name, np.ones(law.n_w)).eps
-    return np.allclose(np.sort(ref), sorted(law.eps), rtol=1e-12)
 
 
 def z_grid(r, law=None):
@@ -137,60 +112,20 @@ def oracle_column(I, z, r):
 
 class TestDefinitions:
     def test_ladders(self):
-        assert np.allclose(ladder(2), [0.01176, 0.3041], rtol=1e-3)
-        assert np.allclose(ladder(3), [0.001597, 0.04128, 0.3874], rtol=1e-3)
+        for K in (1, 2, 3, 4):                 # the formula itself
+            for alpha in (1.0, 25.0 / 16.0, 2.0):
+                ref = [math.exp(2 * math.pi / math.sqrt(alpha)
+                                * (math.sqrt(k + 0.5) - math.sqrt(K))) for k in range(K)]
+                assert np.allclose(ladder(K, alpha), ref, rtol=1e-15, atol=0)
+                assert np.allclose(np.log(ladder(K, alpha)),
+                                   np.log(ladder(K)) / math.sqrt(alpha), rtol=1e-14)
         assert HYBRID2.eps == (0.36,)
-        # hybrid4: LDhybrid v1.0's alpha = 25/16 ladder (its v1.py guard)
         assert H.HYBRID4_ALPHA == 25.0 / 16.0
         assert HYBRID4.eps == ladder(2, 25.0 / 16.0) == H.HYBRID4_EPS
         assert np.allclose(HYBRID4.eps, (0.02860121, 0.38582418), rtol=1e-6)
-        assert np.allclose(np.log(HYBRID4.eps), 0.8 * np.log(ladder(2)),
-                           rtol=1e-14)
         assert HYBRID5.eps == ladder(3)
+        assert np.allclose(HYBRID5.eps, (0.00159655, 0.04127504, 0.38743472), rtol=1e-6)
         assert (HYBRID2.n_w, HYBRID4.n_w, HYBRID5.n_w) == (2, 4, 5)
-
-    @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
-    def test_hybrid2_pole_matches_squishierplanet(self):
-        """Elómë's hybrid2 IS SquishierPlanet's: if either moves its
-        pole this fails, rather than the cross-checks below quietly skipping
-        hybrid2."""
-        from squishierplanet import laws as spl
-        assert H.HYBRID2_EPS == float(spl.HYBRID2_EPS)
-
-    @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
-    def test_hybrid4_poles_match_squishierplanet(self):
-        """Likewise hybrid4 (LDhybrid v1.0's alpha = 25/16 ladder): a
-        SquishierPlanet checkout on other poles fails here instead of the
-        cross-checks below quietly skipping hybrid4. A checkout still on the
-        alpha = 1 ladder has not yet adopted the change (LDhybrid's note
-        docs/upstream/hybrid4_ladder_alpha.md) and is skipped, not failed."""
-        from squishierplanet import laws as spl
-        old = np.sort(spl.hybrid("hybrid4", np.ones(4)).eps)
-        if np.allclose(old, ladder(2), rtol=1e-12):
-            pytest.skip("this SquishierPlanet checkout predates hybrid4's "
-                        "alpha = 25/16 ladder")
-        assert sp_same("hybrid4"), (
-            "SquishierPlanet's hybrid4 poles are not Elómë's "
-            f"{H.HYBRID4_EPS} (ladder(2, alpha_eff=25/16))")
-
-    @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
-    def test_matches_squishierplanet_definitions(self):
-        from squishierplanet import laws as spl
-        assert np.allclose(ladder(2), spl.ladder(2), rtol=1e-15)
-        assert np.allclose(ladder(3), spl.ladder(3), rtol=1e-15)
-        for name in NAMES:
-            if not sp_same(name):
-                continue
-            law = LAWS[name]
-            w = phys_w(law, 1)
-            ref = spl.hybrid(name, w)
-            c, d = w_to_c(law, w)
-            ref_c = np.zeros(3)
-            ref_c[:ref.c.size] = ref.c
-            assert np.allclose(c, ref_c, atol=1e-14)
-            order = np.argsort(ref.eps)
-            assert np.allclose(ref.eps[order], law.eps, rtol=1e-15)
-            assert np.allclose(ref.d[order], d, rtol=1e-12)
 
     @pytest.mark.parametrize("name", NAMES)
     def test_shape_form_equals_expanded_form(self, name):
@@ -287,19 +222,6 @@ class TestColumns:
             p = 1 + eps
             assert abs(got[zs == 0.0][0] + math.pi * r * r / (p * (p - r * r))) < 1e-14 * scale
 
-    @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
-    @pytest.mark.parametrize("r", RS)
-    def test_pole_column_vs_squishierplanet(self, r):
-        for eps in ladder(3) + (H.HYBRID2_EPS,):
-            law = H.HybridLaw("one", (eps,), ())
-            zs = z_grid(r, law)
-            with mx.stream(mx.cpu):
-                got = np.asarray(pole_col(f64(zs), f64(r), eps))
-            ref = -np.array([SPLaw([0.0], [1.0], [eps]).blocked(z, 0.0, r, r)
-                             for z in zs])
-            scale = math.pi / (eps * (1 + eps))
-            assert np.abs(got - ref).max() / scale < 1e-12, eps
-
     @pytest.mark.parametrize("name", NAMES)
     def test_shape_columns_contract(self, name):
         """flux_dev == (B @ c)/(N @ c) with c = (1, -w): the ld_basis
@@ -366,24 +288,6 @@ class TestFlux:
                 got = np.asarray(flux_dev_hybrid(f64(zs), f64(r), w, law))
             ref = np.array([oracle_flux_dev(law, w, z, r) for z in zs])
             assert np.abs(got - ref).max() < 1e-13, (name, r, seed)
-
-    @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
-    @pytest.mark.parametrize("name", NAMES)
-    @pytest.mark.parametrize("r", RS)
-    def test_vs_squishierplanet(self, name, r):
-        """The flux machinery, on Elómë's own law definition (expanded into
-        a squishierplanet Law), so the check holds whatever poles that
-        checkout ships; the definitions are compared separately."""
-        from squishierplanet import laws as spl
-        law = LAWS[name]
-        zs = z_grid(r, law)
-        for seed in (6, 7, 8):
-            w = phys_w(law, seed)
-            with mx.stream(mx.cpu):
-                got = np.asarray(flux_dev_hybrid(f64(zs), f64(r), w, law))
-            L = spl.Law(*w_to_c(law, w), law.eps)
-            ref = np.array([sp.flux(L, z, 0.0, r, r) - 1.0 for z in zs])
-            assert np.abs(got - ref).max() < 1e-12, (name, r, seed)
 
     @pytest.mark.parametrize("name", NAMES)
     def test_uniform_disc_at_zero_weights(self, name):
@@ -644,23 +548,6 @@ class TestPriors:
             ld.hybrid2_vertices(law="hybrid4")
         with pytest.raises(ValueError, match="not both"):
             ld.hybrid2_from_q_np(0.5, 0.5, eps=0.2, law=custom)
-
-    @pytest.mark.skipif(sp is None, reason="squishierplanet not importable")
-    def test_priors_match_squishierplanet(self):
-        """Both packages' DEFAULT hybrid2 prior (drift is reported by
-        test_hybrid2_pole_matches_squishierplanet)."""
-        from squishierplanet import laws as spl
-        if not sp_same("hybrid2"):
-            pytest.skip("this SquishierPlanet checkout's hybrid2 pole is not "
-                        "Elómë's (see the pole test)")
-        rng = np.random.default_rng(1)
-        q1, q2 = rng.random(100), rng.random(100)
-        ref = spl.hybrid2_from_q(q1, q2)
-        w1, w2 = ld.hybrid2_from_q_np(q1, q2)
-        assert np.allclose(np.stack([w1, w2], -1), ref, atol=1e-15)
-        q = rng.random((100, 5))
-        assert np.allclose(ld.simplex_from_q_np(q), spl.simplex_from_q(q),
-                           atol=1e-15)
 
     @pytest.mark.parametrize("n", [4, 5])
     def test_simplex(self, n):

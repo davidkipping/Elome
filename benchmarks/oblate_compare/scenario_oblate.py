@@ -49,7 +49,7 @@ def time_grid(n):
 
 def sky(t):
     """(X, Y) in stellar radii, X along the motion, Y = -b cos(phi)
-    (SquishierPlanet's / squishyplanet's frame); all front-side here."""
+    (squishyplanet's frame); all front-side here."""
     phi = 2.0 * np.pi * (np.asarray(t, np.float64) - T0) / PER
     return A_RS * np.sin(phi), -B_IMPACT * np.cos(phi)
 

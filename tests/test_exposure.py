@@ -206,7 +206,7 @@ class TestIntegrationWithTheRest:
 
 
 class TestRegressions:
-    """Bugs found in the closing audit of v0.4.0."""
+    """Regressions found in an audit of the exposure rules."""
 
     def test_light_curve_mx_also_averages(self):
         """It used to return the INSTANTANEOUS flux at the exposure

@@ -1,12 +1,10 @@
-"""M5 benchmark: analytic VJP vs reverse-mode autodiff for the gradient
+"""Benchmark: analytic VJP vs reverse-mode autodiff for the gradient
 of the chunked log-likelihood — the operation ChEES-HMC pays for at
 every leapfrog step.
 
 Each (path x measurement) runs in a FRESH SUBPROCESS: sustained GPU work
 perturbs later measurements through thermal state and the MLX buffer
-cache (a first, naive in-process version mis-read a 10x forward
-"slowdown" for the custom-function path that was pure ordering artifact
-— in isolation the custom forward fuses identically).
+cache.
 
 Setup mirrors production: 1024 chains x 65536-point chunk, fp32, GPU,
 compiled. Reports medians of 7 in-process reps.

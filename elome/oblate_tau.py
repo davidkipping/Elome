@@ -6,9 +6,8 @@ its principal frame, and integrated over each exposure as the spherical
 path does; this module adds only what the orbit and the exposure need.
 
 **Sky frame.** X along the orbit (the direction of motion at transit), Y
-across, both in stellar radii, with SquishierPlanet's convention (its
-``jaxlc.sky_circular`` and ``orbit.sky_position`` with Omega = pi, pinned
-by a test):
+across, both in stellar radii (the convention is pinned by a test against
+an independent numpy orbit):
 
     circular:   X = a sin phi,   Y = -b cos phi,   in front iff cos phi > 0
     eccentric:  X = -u,          Y = -v cos i,     in front iff v > 0

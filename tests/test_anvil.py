@@ -1,11 +1,10 @@
-"""M4: applemcmc integration — precision harness and injection-recovery.
+"""anvil integration — precision harness and injection-recovery.
 
-The fast tests here gate the milestone: the fp32 GPU likelihood must sit
-well under the ~1-unit Metropolis decision scale against the fp64 CPU
-path (the trapezoid target achieves ~0.2; this model is smoother and
-must beat it). The full HMC/ensemble injection-recovery lives in
-run_injection_recovery.py (GPU-heavy, run separately) with a smaller
-smoke version marked slow here.
+The fast tests require the fp32 GPU likelihood to sit well under the
+~1-unit Metropolis decision scale against the fp64 CPU path. The full
+HMC/ensemble injection-recovery is examples/injection_recovery.py
+(GPU-heavy, run separately), with a smaller smoke version marked slow
+here.
 """
 
 import mlx.core as mx
@@ -16,7 +15,7 @@ from elome.anvil import import_engine
 from elome.anvil import make_quad_transit_flux, make_target
 from elome.orbit import epoch_center_times
 
-applemcmc, _ = import_engine()
+engine, _ = import_engine()
 
 RNG = np.random.default_rng(3)
 
@@ -68,33 +67,31 @@ class TestPrecisionHarness:
     states (per-term fp32 representation of chi^2 terms dominates far
     from truth; decomposition: per-point model error is at the fp32
     floor, rms ~1.4e-8 flux with ~1e-9 bias, and neither chunk size nor
-    fp64_anchor moves the total). So the comparison against the
-    trapezoid's ~0.2 is made at *matched* |logL| magnitude ~5e4 — where
-    accept/reject actually operates — and in relative terms at the
-    engine-convention displaced states.
+    fp64_anchor moves the total). So the bounds are set at *matched*
+    |logL| magnitude ~5e4 — where accept/reject actually operates — and in
+    relative terms at the engine-convention displaced states.
     """
 
-    def test_relative_precision_beats_trapezoid_wide_states(self, tt):
-        """Engine-recipe states (u +- 0.05): relative error must beat the
-        trapezoid's measured 0.18/5.2e4 = 3.5e-6."""
+    def test_relative_precision_wide_states(self, tt):
+        """Engine-recipe states (u +- 0.05): relative error under 2.5e-6."""
         u_truth = tt.transform.from_model_np(tt.truth_model)
         u = mx.array(
             (u_truth + 0.05 * RNG.standard_normal((32, 8))).astype(np.float32))
-        report = applemcmc.validate_precision(tt.target, u)
+        report = engine.validate_precision(tt.target, u)
         print("\n", report, sep="")
         rel = report.median_abs_err / report.median_logl_magnitude
         assert rel < 2.5e-6, f"relative fp32 error {rel:.2e}"
 
     def test_absolute_precision_at_matched_magnitude(self, tt):
-        """States with |logL| ~ 5e4 (the trapezoid test's magnitude):
-        median well under its 0.18, max well under 1."""
+        """States with |logL| ~ 5e4: median error under 0.15, max well
+        under the ~1-unit Metropolis scale."""
         u_truth = tt.transform.from_model_np(tt.truth_model)
         u = mx.array(
             (u_truth + 0.005 * RNG.standard_normal((32, 8))).astype(np.float32))
-        report = applemcmc.validate_precision(tt.target, u)
+        report = engine.validate_precision(tt.target, u)
         print("\n", report, sep="")
         assert report.median_logl_magnitude < 1.2e5  # sanity: comparable
-        assert report.median_abs_err < 0.15, "did not beat trapezoid's 0.18"
+        assert report.median_abs_err < 0.15, "median fp32 logL error"
         assert report.max_abs_err < 1.0, "fp32 error at Metropolis scale"
 
     def test_near_posterior_states(self, tt):
@@ -102,7 +99,7 @@ class TestPrecisionHarness:
         u_truth = tt.transform.from_model_np(tt.truth_model)
         u = mx.array(
             (u_truth + 0.002 * RNG.standard_normal((32, 8))).astype(np.float32))
-        report = applemcmc.validate_precision(tt.target, u)
+        report = engine.validate_precision(tt.target, u)
         assert report.median_abs_err < 0.1
         assert report.max_abs_err < 0.6
 
@@ -132,8 +129,8 @@ class TestInjectionRecoverySmoke:
         u0 = mx.array(
             (u_truth + 0.01 * RNG.standard_normal((n_chains, 8))
              ).astype(np.float32))
-        kernel = applemcmc.ChEESHMC(tt.target, max_leapfrog=64)
-        res = applemcmc.run(kernel, tt.target, u0, n_warmup=150,
+        kernel = engine.ChEESHMC(tt.target, max_leapfrog=64)
+        res = engine.run(kernel, tt.target, u0, n_warmup=150,
                             n_samples=100, seed=1, reanchor_every=100)
         assert res.extras.get("n_divergent", 0) == 0
         flat = res.get_chain(flat=True).astype(np.float64)

@@ -1211,7 +1211,7 @@ def make_model_core_metal(period_ref: float):
     return core
 
 
-#: retired name — the eccentric kernel IS the model kernel now
+#: alias: the eccentric kernel is the model kernel
 make_ecc_core_metal = make_model_core_metal
 
 
@@ -1418,9 +1418,9 @@ def flux_dev_metal(z: mx.array, r, u1=None, u2=None, *,
         return _ld_basis_metal(z, r)
     if u1 is None or u2 is None:
         raise ValueError("u1 and u2 are required unless ld_basis=True")
-    # the data's dtype is the computation's on the graph route too (0.10.6
-    # handed it an fp64 r as is: an exception on the GPU, an fp64 result
-    # on the CPU stream)
+    # the data's dtype is the computation's on the graph route too (an fp64
+    # r as is would raise on the GPU and give an fp64 result on the CPU
+    # stream)
     r, u1, u2 = (_as_dtype(p, z.dtype) for p in (r, u1, u2))
     if (z.dtype != mx.float32 or z.ndim not in (1, 2)
             or not _gpu_stream_active() or not metal_available()):
@@ -1453,8 +1453,8 @@ _INT_MODES = {"none": _INT_NONE, "contact": _INT_CONTACT,
               "supersample": _INT_SUPER}
 
 
-#: the eccentric solve's numerical validity ceiling
-#: (docs/eccentric-kernel-notes.md); floors 1 - e^2 exactly as anvil does
+#: the eccentric solve's numerical validity ceiling; floors 1 - e^2
+#: exactly as anvil does
 _E_MAX = 0.999
 
 
@@ -1516,8 +1516,8 @@ def _tau_graph(tau, period, a, b, r, u1, u2, exp_time, mode, n_gl, n_sub,
     """The MLX-graph equivalent of the kernel, used for fp64, the CPU
     stream, and any machine where the kernel probe fails.
 
-    turin needs this for anvil's ``validate_precision`` and ``certify``, so
-    it is a supported path and not a fallback of last resort: it computes
+    A sampler validating fp32 against fp64 (anvil's ``validate_precision``
+    and ``certify``) needs this, so it is a supported path and not a fallback of last resort: it computes
     the *same function*, including detaching the contacts, so that the two
     paths' gradients agree and not merely their values.
 
@@ -1585,7 +1585,8 @@ def _tau_graph(tau, period, a, b, r, u1, u2, exp_time, mode, n_gl, n_sub,
     # the split points move with the period while the kernel's are frozen.
     # Both are valid gradients of the same model -- a split point is
     # interior, so moving it adds +f(c) dc and -f(c) dc -- but they are not
-    # the same function, and turin certifies in fp64 what it runs in fp32.
+    # the same function, and a sampler certifies in fp64 what it runs in
+    # fp32.
     # The period keeps its gradient where it belongs: in the phase.
     per1, a1, b1, r1 = col(1)[:4]
     if ecc:
@@ -1667,8 +1668,8 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
             then the area-equivalent radius sqrt(A B), with
             r <= (1 - f)^(3/2). Hybrid laws only. Omit both for a
             spherical planet (the default, whose paths they do not touch);
-            theta defaults to 0 when f is given. The sky frame and theta
-            are SquishierPlanet's; the contacts are solved per side.
+            theta defaults to 0 when f is given (sky frame and theta
+            convention: ``oblate_tau``); the contacts are solved per side.
             fp32 data on the GPU takes the oblate Metal kernels
             (``metal_oblate``); fp64 the MLX graph on the CPU stream. In
             fp32, below f = 1e-5 a chain takes the spherical forms and

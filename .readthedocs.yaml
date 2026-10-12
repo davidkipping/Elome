@@ -1,0 +1,17 @@
+# Read the Docs build: a static Sphinx site. The tutorials are committed
+# with their outputs and the API pages are generated in the repository
+# (docs/make_api.py), so the build needs neither MLX nor a GPU.
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.12"
+
+sphinx:
+  configuration: docs/conf.py
+  fail_on_warning: true
+
+python:
+  install:
+    - requirements: docs/requirements.txt

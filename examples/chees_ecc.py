@@ -1,16 +1,15 @@
-"""E5: end-to-end eccentric ChEES-HMC injection-recovery.
+"""End-to-end eccentric ChEES-HMC injection-recovery.
 
 The truth is deliberately LOW eccentricity (e = 0.02). That is where the
 (sqrt(e) cos w, sqrt(e) sin w) parameterization earns its keep — and
 where the direct orbit formulation's float32 gradients are already
 degrading, so it is the honest test of the transit-anchored solve the
 fused kernel is built on (see elome/anchored.py and
-benchmarks/v3_kh_grad_conditioning.py).
+benchmarks/kh_grad_conditioning.py).
 
 Success = zero divergences and truth recovered within a few sigma.
 
-Two things this script had to learn the hard way, both measured by
-benchmarks/v3_ecc_sampling_geometry.py:
+Two things to know, both measured by benchmarks/ecc_sampling_geometry.py:
 
   * **Warmup matters more here than in the circular problem.** At 200
     warmup iterations ChEES produced ~1% divergences; at 400-600 it

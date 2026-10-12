@@ -1,7 +1,7 @@
 """TransitModel.light_curves: many parameter sets, one dispatch.
 
 ``light_curve`` is one-set-at-a-time for batman parity, and looping it is
-the failure mode docs/sampler-integration.md warns about. These tests pin
+the failure mode the sampler guide warns about. These tests pin
 that the batched form agrees with the loop to round-off in every mode the
 frontend supports, and that mixed circular/eccentric batches work (the
 transit-anchored orbit degenerates exactly at e = 0).

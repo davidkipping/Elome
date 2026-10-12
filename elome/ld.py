@@ -58,7 +58,7 @@ def u_to_q_np(u1, u2):
 
 # ---------------------------------------------------------------------------
 # hybrid laws (elome/hybrid.py): uniform priors on their physical
-# regions, after SquishierPlanet's laws.py
+# regions
 # ---------------------------------------------------------------------------
 
 def _hybrid2_pole(eps=None, law=None) -> float:

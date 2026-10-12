@@ -456,7 +456,7 @@ def test_argument_checks():
 
 
 # ---------------------------------------------------------------------------
-# the entry point's own fallback is hybrid.py's graph, bitwise (0.10.4)
+# the entry point's own fallback is hybrid.py's graph, bitwise
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("law", ["hybrid2", "hybrid4", "hybrid5"])
@@ -474,7 +474,7 @@ def test_z_entry_fallback_is_flux_dev_hybrid_bitwise(law, dtype):
     r = mx.array([0.05, 0.1, 0.3], dtype=dtype)
     w = mx.array(rng.dirichlet(np.ones(n_w + 1), 3)[:, :n_w], dtype=dtype)
     if dtype == mx.float64:
-        # the entry point puts fp64 on the CPU stream itself (0.10.5);
+        # the entry point puts fp64 on the CPU stream itself;
         # the reference needs the stream from us
         a = flux_dev_metal_hybrid(z, r, law, w)
         with mx.stream(mx.cpu):
@@ -489,7 +489,7 @@ def test_z_entry_fallback_is_flux_dev_hybrid_bitwise(law, dtype):
 
 
 # ---------------------------------------------------------------------------
-# fp64 on the default stream falls back; the tau graph's combine (0.10.5)
+# fp64 on the default stream falls back; the tau graph's combine
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("call", ["z-hybrid", "z-hybrid-basis",
@@ -497,9 +497,9 @@ def test_z_entry_fallback_is_flux_dev_hybrid_bitwise(law, dtype):
                                   "flux_dev_metal-quadratic",
                                   "flux_dev_metal-ld_basis"])
 def test_fp64_on_the_default_stream_falls_back_instead_of_raising(call):
-    """Every z-input entry point, like the tau ones since 0.8.2, puts
-    fp64 on the CPU stream itself: before 0.10.5 all five raised MLX's
-    'float64 is not supported on the GPU' unless the caller knew to."""
+    """Every z-input entry point, like the tau ones, puts fp64 on
+    the CPU stream itself, instead of raising MLX's 'float64 is not
+    supported on the GPU' unless the caller knew to."""
     from elome.metal import flux_dev_metal
     from elome.metal_hybrid import flux_dev_metal_hybrid
     z = mx.array(np.linspace(0.3, 1.2, 50), dtype=mx.float64)
@@ -524,8 +524,8 @@ def test_fp64_on_the_default_stream_falls_back_instead_of_raising(call):
 def test_tau_graph_combine_is_the_shared_expression_bitwise(law, dtype):
     """Off the kernel, flux_dev_from_tau's scalar hybrid call equals
     hybrid.combine_cols over its own ld_basis columns, bitwise: the tau
-    graph contracts with the one shared expression (0.10.4's dot product
-    was 2.4e-7 apart in fp32)."""
+    graph contracts with the one shared expression (a separate dot product
+    was once 2.4e-7 apart in fp32)."""
     from elome.hybrid import LAWS, combine_cols
     from elome.metal import flux_dev_from_tau
     n_w = LAWS[law].n_w
@@ -543,7 +543,7 @@ def test_tau_graph_combine_is_the_shared_expression_bitwise(law, dtype):
 
 
 # ---------------------------------------------------------------------------
-# the dtype contract (0.10.6): data dtype = computation dtype; parameters
+# the dtype contract: data dtype = computation dtype; parameters
 # of the other dtype are cast; numpy inputs keep their precision
 # ---------------------------------------------------------------------------
 
@@ -572,8 +572,8 @@ def _entries(z, tau, r, u1, w):
                                    "tau-quadratic", "tau-hybrid"])
 def test_fp64_parameters_with_fp32_data_take_the_kernel(entry):
     """An fp64 mx.array radius / coefficient / weight vector alongside
-    fp32 data is cast to fp32 (on the CPU stream) and the kernel runs;
-    before 0.10.6 every kernel entry point raised MLX's GPU error. Equal
+    fp32 data is cast to fp32 (on the CPU stream) and the kernel runs,
+    where every kernel entry point once raised MLX's GPU error. Equal
     to the all-fp32 call to an fp32 ulp. Forward only: that the kernel
     ran is asserted by spies, and the gradient's supported form pinned,
     in test_entry_contract.py."""
@@ -594,9 +594,9 @@ def test_fp64_parameters_with_fp32_data_take_the_kernel(entry):
 def test_non_mlx_data_keeps_its_precision(entry, kind):
     """A float64 numpy array or a Python list is fp64 (the CPU graph,
     bitwise what the explicit fp64 mx.array gives); float32 numpy is fp32
-    (the kernel, bitwise what the explicit fp32 mx.array gives). Before
-    0.10.6 mx.array() took float64 numpy to fp32 silently on the hybrid
-    and tau entries, and the quadratic z entry raised."""
+    (the kernel, bitwise what the explicit fp32 mx.array gives). Once,
+    mx.array() took float64 numpy to fp32 silently on the hybrid and tau
+    entries, and the quadratic z entry raised."""
     if kind == "numpy-f64":
         z, tau, dt = Z, TAU, mx.float64
     elif kind == "numpy-f32":
@@ -613,7 +613,7 @@ def test_non_mlx_data_keeps_its_precision(entry, kind):
 
 
 # ---------------------------------------------------------------------------
-# kernels are cached per law definition, not per name (0.12.0)
+# kernels are cached per law definition, not per name
 # ---------------------------------------------------------------------------
 
 @pytest.mark.skipif(not metal_available(), reason="Metal unavailable")
@@ -683,7 +683,7 @@ def test_a_renamed_registered_law_shares_its_kernels():
 
 @pytest.mark.skipif(not metal_available(), reason="Metal unavailable")
 def test_a_registered_name_need_not_be_a_metal_identifier():
-    """A registered law named "my-law" aborted the interpreter in 0.12.1
+    """A registered law named "my-law" once aborted the interpreter
     (its name went into the Metal kernel name unsanitised). Run in a
     subprocess so a regression fails this test, not the whole session."""
     import subprocess

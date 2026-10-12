@@ -1,4 +1,4 @@
-"""Stage 2: analytic custom VJP for the photometric core (ALFM19 closed-
+"""Analytic custom VJP for the photometric core (ALFM19 closed-
 form partials).
 
 Reverse-mode autodiff through the elementwise cel3 graph is memory-
@@ -189,8 +189,8 @@ def _ld_basis_vjp(primals, cotangent, output):
 def _shape(x):
     """A primal's shape for _unbroadcast; a Python number (a parameter
     passed as a plain float) is a scalar -- MLX takes any cotangent for
-    it and discards it. (Before 0.10.7, ``.shape`` on a float crashed the
-    backward pass of a gradient taken with float coefficients.)"""
+    it and discards it (``.shape`` on a float would crash the backward
+    pass of a gradient taken with float coefficients)."""
     return x.shape if isinstance(x, mx.array) else ()
 
 
