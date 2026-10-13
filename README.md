@@ -1,9 +1,9 @@
-# Elómë &nbsp;<picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/elome_tengwar_dark.svg"><img src="docs/assets/elome_tengwar_light.svg" alt="Elómë in Tengwar" height="44" align="top"></picture>
+# Elómë &nbsp;<picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/davidkipping/elome/main/docs/assets/elome_tengwar_dark.svg"><img src="https://raw.githubusercontent.com/davidkipping/elome/main/docs/assets/elome_tengwar_light.svg" alt="Elómë in Tengwar" height="44" align="top"></picture>
 
 **Analytic, differentiable transit light curves on Apple Silicon.**
 
 [![Documentation](https://readthedocs.org/projects/elome/badge/?version=latest)](https://elome.readthedocs.io)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/davidkipping/elome/blob/main/LICENSE)
 
 Elómë computes exoplanet transit light curves exactly and in closed form,
 with analytic gradients in every parameter. It runs on
@@ -19,7 +19,7 @@ keep their light curves elementary. The frontend follows
 ## Installation
 
 ```bash
-pip install git+https://github.com/davidkipping/elome
+pip install elome
 ```
 
 Elómë needs a Mac with Apple Silicon for its GPU kernels, Python 3.10 or
@@ -57,4 +57,4 @@ the hybrid-law papers; see
 
 ## License
 
-MIT; see [LICENSE](LICENSE).
+MIT; see [LICENSE](https://github.com/davidkipping/elome/blob/main/LICENSE).

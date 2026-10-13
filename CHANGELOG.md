@@ -5,6 +5,18 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.16.1] — 2026-10-13
+
+### Added
+- **On PyPI: `pip install elome`.** Releases are published by a GitHub
+  Actions workflow (`.github/workflows/publish.yml`) through PyPI trusted
+  publishing when a GitHub release is published.
+
+### Changed
+- Packaging metadata uses an SPDX license expression (`license = "MIT"`,
+  `license-files`), and the README's images and links are absolute so that
+  they render on PyPI.
+
 ## [0.16.0] — 2026-10-12
 
 The first public-facing release.

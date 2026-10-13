@@ -10,10 +10,10 @@
 
 ## Install
 
-From GitHub:
+From PyPI:
 
 ```bash
-pip install git+https://github.com/davidkipping/elome
+pip install elome
 ```
 
 or from a clone, for development:
