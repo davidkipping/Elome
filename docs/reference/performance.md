@@ -69,7 +69,7 @@ log-likelihood at 1024 chains × 65,536 points, compiled, in float32
 The fused kernel keeps the whole model (orbit, Kepler solve and
 photometry) in registers, with about 12 bytes of memory traffic per
 point. That is 20 times faster than the same model as a compiled MLX graph,
-and about 500 times faster for the gradient than reverse-mode
+and about 450 times faster for the gradient than reverse-mode
 differentiation. End to end, a 1024-chain ChEES-HMC
 injection-recovery fit runs at about 13 effective samples per second
 with no divergences.

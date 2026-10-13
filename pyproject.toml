@@ -28,8 +28,7 @@ Issues = "https://github.com/davidkipping/elome/issues"
 
 [project.optional-dependencies]
 test = ["pytest", "scipy", "batman-package", "mpmath"]
-docs = ["sphinx>=7", "myst-nb>=1.1", "sphinx-book-theme>=1.1",
-        "sphinx-copybutton", "sphinx-design"]
+# the documentation's build dependencies are pinned in docs/requirements.txt.
 # the sampling engine, anvil, is an optional integration dependency --
 # install it separately for elome.anvil:
 #   pip install git+https://github.com/davidkipping/anvil

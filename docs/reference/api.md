@@ -373,6 +373,18 @@ returns finite flux for unphysical geometries, exactly as the
 circular model does.
 ```
 
+### `anvil.PARAM_NAMES`
+
+```python
+PARAM_NAMES = ['t0_off', 'p_off', 'r', 'b', 'a', 'q1', 'q2', 'df0']
+```
+
+### `anvil.PARAM_NAMES_ECC`
+
+```python
+PARAM_NAMES_ECC = ['t0_off', 'p_off', 'r', 'b', 'a', 'q1', 'q2', 'secosw', 'sesinw', 'df0']
+```
+
 ### `anvil.make_transit_target`
 
 ```python
@@ -449,6 +461,16 @@ float64 on the CPU; only per-orbit residuals, orbit numbers, and
 baseline-subtracted fluxes ever reach float32.
 ```
 
+### `anvil.QuadTransitTarget`
+
+```python
+QuadTransitTarget(target: object, transform: object, loglike: object, truth_model: np.ndarray, t_ref: float, t_model: np.ndarray, y: np.ndarray) -> None
+```
+
+```text
+Synthetic quadratic-LD transit-fitting problem (anvil-ready).
+```
+
 ### `anvil.make_ecc_target`
 
 ```python
@@ -457,6 +479,16 @@ make_ecc_target(n_data: int = 100000, baseline_days: float = 90.0, yerr: float =
 
 ```text
 Injection-recovery problem for the 10-parameter eccentric model.
+```
+
+### `anvil.EccTransitTarget`
+
+```python
+EccTransitTarget(target: object, transform: object, loglike: object, truth_model: np.ndarray, t_ref: float, t_model: np.ndarray, y: np.ndarray) -> None
+```
+
+```text
+Synthetic eccentric transit-fitting problem (anvil-ready).
 ```
 
 ### `anvil.ecc_constraint_penalty`

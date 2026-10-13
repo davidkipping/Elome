@@ -28,8 +28,10 @@ SECTIONS = [
      "Ready-made models and fitting problems for the anvil engine. See "
      "{doc}`../spherical/fitting`.",
      ["elome.anvil.make_quad_transit_flux", "elome.anvil.make_ecc_transit_flux",
+      "elome.anvil.PARAM_NAMES", "elome.anvil.PARAM_NAMES_ECC",
       "elome.anvil.make_transit_target", "elome.anvil.TransitTarget",
-      "elome.anvil.make_target", "elome.anvil.make_ecc_target",
+      "elome.anvil.make_target", "elome.anvil.QuadTransitTarget",
+      "elome.anvil.make_ecc_target", "elome.anvil.EccTransitTarget",
       "elome.anvil.ecc_constraint_penalty", "elome.anvil.PenalizedLogLike",
       "elome.anvil.import_engine", "elome.anvil.DEFAULT_BOUNDS"]),
     ("Limb darkening",

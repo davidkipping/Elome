@@ -69,6 +69,6 @@ a sampler should call them: once per step, for every chain. See
   point.
 - **Gradients.** The gradient kernels write several full
   `(n_chains, m)` per-point gradient arrays before reducing them, about
-  32 bytes per point. At $10^9$ points in total that is 28 GB; split the
+  32 bytes per point. At $10^9$ points in total that is 32 GB; split the
   data axis well before that. anvil's `ChunkedGaussianLogLike` does so
-  automatically, in 65,536-point chunks.
+  automatically, in 16,384-point chunks by default.

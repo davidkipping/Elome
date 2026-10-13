@@ -3,8 +3,10 @@
 ## Requirements
 
 - **A Mac with Apple Silicon** (M1 or later) for the GPU kernels. The
-  float64 path runs on the CPU and does not need the GPU; on a machine
-  without a usable Metal device, Elómë runs everything on that path.
+  float64 path runs on the CPU and does not need the GPU. Without a
+  usable Metal device, `metal_available()` returns `False` with a warning,
+  and float32 calls run an MLX graph of the same model instead of the
+  fused kernels: the same float32 results, about ten times slower.
 - **Python 3.10 or later**, with [MLX](https://github.com/ml-explore/mlx)
   0.30 or later and NumPy. pip installs both for you.
 

@@ -4,17 +4,10 @@ If Elómë contributes to your research, please cite the software paper:
 
 > Kipping, D. (in preparation). *Elómë: analytic, differentiable transit
 > light curves on Apple Silicon.* Journal of Open Source Software.
-> [doi:10.21105/joss.XXXXX](https://doi.org/10.21105/joss.XXXXX)
 
-```bibtex
-@article{elome,
-  author  = {Kipping, David},
-  title   = {Elómë: analytic, differentiable transit light curves on Apple Silicon},
-  journal = {Journal of Open Source Software},
-  year    = {in preparation},
-  doi     = {10.21105/joss.XXXXX}
-}
-```
+The reference, DOI and BibTeX entry will appear here once the paper is
+published. Until then, please cite the software by its repository,
+<https://github.com/davidkipping/elome>, and the version you used.
 
 ## The hybrid limb-darkening laws
 
@@ -22,12 +15,11 @@ If you use the hybrid laws (`hybrid2`, `hybrid4`, `hybrid5`), or model an
 oblate planet, please also cite:
 
 - **The hybrid-law paper**, which introduces the laws and proves that they
-  give elementary transit light curves for spherical and oblate planets:
-  in preparation, [arXiv:XXXX.XXXXX](https://arxiv.org/abs/XXXX.XXXXX).
+  give elementary transit light curves for spherical and oblate planets
+  (in preparation).
 - **The hybrid-law coefficients paper**, which tunes the laws' poles and
   tabulates their limb-darkening coefficients for stellar models and
-  passbands: in preparation,
-  [arXiv:XXXX.XXXXX](https://arxiv.org/abs/XXXX.XXXXX).
+  passbands (in preparation).
 
 ## The methods Elómë builds on
 

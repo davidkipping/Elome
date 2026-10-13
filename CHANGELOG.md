@@ -5,6 +5,20 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+### Documentation
+- Corrections from a review of the docs: the eccentric anvil model's
+  parameter order (`secosw`, `sesinw` come before `df0`; `PARAM_NAMES`,
+  `PARAM_NAMES_ECC` and both target classes are now in the API
+  reference); current kernel timings (21.8 / 60.2 ms, about 450x reverse
+  mode); anvil's default chunk size (16,384); the gradient-memory
+  arithmetic; the white-dwarf example (a 16%-deep grazing eclipse) and the
+  total-eclipse exposure figures; what runs without a usable Metal device;
+  the eccentric float64 accuracy (4e-16).
+- Tutorial 2 says that anvil-gp is not yet public. The citation page shows
+  the forthcoming papers without placeholder links.
+- The documentation's build dependencies are pinned in one place,
+  `docs/requirements.txt` (the `docs` extra is gone).
+
 ## [0.16.1] — 2026-10-13
 
 ### Added

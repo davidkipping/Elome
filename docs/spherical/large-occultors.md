@@ -19,7 +19,7 @@ p = elome.TransitParams()
 p.t0, p.per, p.rp, p.a = 0.0, 1.4079, 7.28, 336.0     # WD 1856+534 b-like
 p.inc = math.degrees(math.acos(7.79 / p.a))           # b = 7.79: grazing
 p.ecc, p.w, p.limb_dark, p.u = 0.0, 90.0, "quadratic", [0.4, 0.25]
-t = np.linspace(-0.01, 0.01, 2001)                    # an 8-minute eclipse
+t = np.linspace(-0.01, 0.01, 2001)                    # a 5-minute, 16%-deep graze
 flux = elome.TransitModel(p, t).light_curve(p)        # float64: exact
 ```
 
@@ -42,9 +42,10 @@ error in the table.
 ## Things to know
 
 - **Exposure integration.** The contact rule converges as it does for a
-  planet, but a 100%-deep eclipse makes its absolute error 100 times
-  larger: about $10^{-5}$ at `n_gl = 5` for a 2-minute exposure of an
-  8-minute eclipse, and below $10^{-6}$ at `n_gl = 9`.
+  planet, but its absolute error scales with the eclipse depth. For a
+  *total* eclipse ($b < r_p - 1$, 100% deep; not the grazing example
+  above), a 2-minute exposure of an 8-minute eclipse is accurate to about
+  $10^{-5}$ at `n_gl = 5` and to below $10^{-6}$ at `n_gl = 9`.
 - **Sampler bounds.** The ready-made anvil targets bound `r` to
   $[0.005, 0.5]$, `b` to $[0, 1.2]$ and `a` to $[1.5, 200]$ by default
   (`elome.anvil.DEFAULT_BOUNDS`). For a

@@ -49,10 +49,9 @@ and the API reference.
 ## Citation
 
 If Elómë contributes to your research, please cite the Elómë paper
-(Kipping, in preparation, *Journal of Open Source Software*,
-[doi:10.21105/joss.XXXXX](https://doi.org/10.21105/joss.XXXXX)). If you
-use the hybrid limb-darkening laws or oblate planets, please also cite
-the hybrid-law papers; see
+(Kipping, in preparation, *Journal of Open Source Software*). If you use
+the hybrid limb-darkening laws or oblate planets, please also cite the
+hybrid-law papers, also in preparation; see
 [Citing Elómë](https://elome.readthedocs.io/en/latest/about/citing.html).
 
 ## License

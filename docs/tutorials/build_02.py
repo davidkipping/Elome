@@ -6,10 +6,6 @@ Generated rather than hand-edited so the prose and code stay reviewable in a
 diff. Every code cell is executed before the notebook is committed. At the
 settings below the joint fit measured 0 divergences, R-hat 1.002 and every one
 of the twelve parameters within 1.2 sigma, in about two minutes on an M2 Max.
-
-The authoritative non-tutorial version of this fit, including the
-cross-sampler agreement check, is anvil-gp's
-examples/hotjupiter_gp_joint.py.
 """
 import os
 import sys
@@ -46,9 +42,8 @@ starspots"*.
 
 Expect this notebook to take about two to three minutes, most of it the fit.
 
-> The validation version of this same fit — with a second sampler run and a
-> cross-sampler agreement check — is `examples/hotjupiter_gp_joint.py` in the
-> anvil-gp repository. This notebook is the annotated walkthrough.
+> **anvil-gp is not yet publicly released**, so this tutorial can be read
+> but not yet run. Tutorials 1 and 3 need only public packages.
 """)
 
 md("""
@@ -402,10 +397,9 @@ checks are worth the time:
 
 1. **Run a second, gradient-free sampler** and compare. A wrong gradient
    anywhere in the chain — transit model, GP likelihood, or the transform —
-   moves the ChEES posterior but not the ensemble's. anvil-gp's
-   `examples/hotjupiter_gp_joint.py` does exactly this and reports agreement
-   on every median to 0.04 sigma and every width to 2%. It is not repeated
-   here only because the ensemble needs thousands of iterations to
+   moves the ChEES posterior but not the ensemble's. Done for this fit, the
+   two agree on every median to 0.04 sigma and every width to 2%. It is not
+   repeated here only because the ensemble needs thousands of iterations to
    decorrelate, which would dominate this notebook's runtime.
 2. **Check the GP did not eat the transit.** If `gp_sigma` drifts up toward
    the transit depth while `r` drifts down, the two are trading. Comparing the
@@ -438,8 +432,6 @@ than silently falling back.
 
 * [Tutorial 1](01_elome_with_anvil.ipynb): the transit-only fit, and the
   forward-model tour.
-* anvil-gp's `examples/hotjupiter_gp_joint.py` — this fit with the
-  cross-sampler agreement check, at full size.
 * [Fitting a spherical planet](../spherical/fitting.md): batching,
   conditioning and the eccentric constraint barrier in depth.
 """)

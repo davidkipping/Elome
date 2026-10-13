@@ -58,7 +58,8 @@ Three ways to evaluate the model:
 
 The default model is float64 on the CPU. It is the exact reference:
 light curves agree with a 30-digit direct integral of the occulted
-intensity to $2\times10^{-16}$, circular or eccentric. Against batman,
+intensity to $2\times10^{-16}$ on a circular orbit and $4\times10^{-16}$
+on an eccentric one. Against batman,
 the agreement is at batman's own accuracy, about $10^{-8}$.
 
 `dtype=mx.float32` runs on the GPU, in a single fused Metal kernel that

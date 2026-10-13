@@ -104,8 +104,8 @@ documented for the circular case.
 
 Only Elómë and jaxoplanet are differentiable, and only Elómë
 ships analytic gradients, fused into a Metal backward kernel: value+gradient
-costs 52.5 ms vs 27.3 s for reverse-mode autodiff at 1024 x 65,536 — a
-519x spread that is the number that matters for HMC sampling. batman,
+costs 60.2 ms vs 27.3 s for reverse-mode autodiff at 1024 x 65,536 — a
+~450x spread that is the number that matters for HMC sampling. batman,
 PyTransit, exoplanet-core (numpy layer), and ellc provide no gradients.
 
 ## In-kernel exposure integration (512 chains x 5,000 points, M2 Max)

@@ -13,10 +13,13 @@ want: `model_fn(v, x)` maps a `(n_chains, n_params)` array of parameters
 and the data's times to a `(n_chains, m)` array of flux deviations, in
 one fused Metal kernel, with analytic gradients.
 
-| builder | parameters |
+| builder | parameters, in order |
 |---|---|
 | `make_quad_transit_flux(period_ref)` | `t0_off, p_off, r, b, a, q1, q2, df0` (8, circular) |
-| `make_ecc_transit_flux(period_ref)` | the same plus `secosw, sesinw` (10, eccentric) |
+| `make_ecc_transit_flux(period_ref)` | `t0_off, p_off, r, b, a, q1, q2, secosw, sesinw, df0` (10, eccentric) |
+
+The order is `elome.anvil.PARAM_NAMES` and `PARAM_NAMES_ECC`: in the
+eccentric model `secosw` and `sesinw` come *before* `df0`.
 
 - `t0_off` and `p_off` are offsets from a reference epoch and period, so
   that float32 carries small numbers.
@@ -135,9 +138,10 @@ any error:
    likelihood run eagerly is about twice as slow at 1024 × 65,536 points
    (12.97 against 6.32 ms).
 3. **Use `ChunkedGaussianLogLike`, not a bare `mx.sum`.** A single
-   float32 sum over many more than 65,536 points accumulates rounding
-   towards the scale of a Metropolis decision. The chunked tree keeps it
-   small. Casting the finished float32 sum to float64 recovers nothing.
+   float32 sum over a long light curve accumulates rounding towards the
+   scale of a Metropolis decision. The chunked tree (16,384-point chunks
+   by default) keeps it small. Casting the finished float32 sum to float64
+   recovers nothing.
 
 ## Your own sampler
 
@@ -195,8 +199,9 @@ From the reference run (`examples/chees_ecc.py`, measured by
 MLX computes a gradient only when a sampler asks for one, with `mx.grad`
 or `mx.vjp`, and Elómë's gradient kernels recompute what they need rather
 than storing a tape. So a forward-only sampler (Metropolis, the stretch
-move, emcee) pays only for the forward kernel: 17.5 ms at 1024 chains ×
-65,536 points. A gradient sampler such as ChEES-HMC pays 52.5 ms for the
-value and gradient together. That is three times a forward evaluation,
-and 519 times cheaper than reverse-mode automatic differentiation of the
-same model.
+move, emcee) pays only for the forward kernel: 21.8 ms at 1024 chains ×
+65,536 points on a circular orbit. A gradient sampler such as ChEES-HMC
+pays 60.2 ms for the value and gradient together. That is under three
+times a forward evaluation, and about 450 times cheaper than reverse-mode
+automatic differentiation of the same model (see
+{doc}`../reference/performance`).

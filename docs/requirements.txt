@@ -1,5 +1,12 @@
-sphinx>=7
-myst-nb>=1.1
-sphinx-book-theme>=1.1
-sphinx-copybutton
-sphinx-design
+# The documentation's build dependencies, pinned so that a new release of
+# any of them cannot break the Read the Docs build (it treats warnings as
+# errors). Read the Docs installs exactly this file; locally:
+#   pip install -r docs/requirements.txt
+#   python -m sphinx -b html -W docs docs/_build/html
+sphinx==9.0.4
+myst-parser==5.1.0
+myst-nb==1.4.0
+sphinx-book-theme==1.4.0
+pydata-sphinx-theme==0.20.0
+sphinx-copybutton==0.5.2
+sphinx-design==0.7.0

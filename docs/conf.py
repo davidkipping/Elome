@@ -30,8 +30,7 @@ myst_heading_anchors = 3
 nb_execution_mode = "off"    # notebooks are executed before they are committed
 nb_merge_streams = True
 
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "assets/README.md",
-                    "**/.ipynb_checkpoints"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/.ipynb_checkpoints"]
 
 html_theme = "sphinx_book_theme"
 html_title = "Elómë"

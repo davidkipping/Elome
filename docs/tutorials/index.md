@@ -7,10 +7,16 @@ with their outputs, and the notebooks themselves are in the repository's
 | tutorial | what it covers | needs |
 |---|---|---|
 | {doc}`01_elome_with_anvil` | A tour of the forward model (orbits, limb darkening, exposures, batching), then a fit of Kepler-like photometry with anvil's gradient-based HMC. | `elome`, `anvil` |
-| {doc}`02_joint_transit_and_gp` | A transit and correlated stellar variability fitted together: Elómë as the mean model and a Gaussian process over the residual, all twelve parameters sampled at once. | `elome`, `anvil`, `anvilgp` |
+| {doc}`02_joint_transit_and_gp` | A transit and correlated stellar variability fitted together: Elómë as the mean model and a Gaussian process over the residual, all twelve parameters sampled at once. | `elome`, `anvil`, `anvilgp` (not yet public) |
 | {doc}`03_spherical_and_oblate_planets` | Spherical and oblate planets side by side: light curves, hybrid limb darkening, exposures, gradients, batching and the sampler API for each, then what is new for an oblate planet. | `elome` |
 
 `matplotlib` is optional: every cell also prints its numbers.
+
+```{note}
+Tutorial 2 uses **anvil-gp**, a Gaussian-process package that is not yet
+publicly released, so it can be read here but not yet run. The other two
+tutorials need only public packages.
+```
 
 Measured on an M2 Max, the two fits are healthy at the settings used:
 tutorial 1 reaches no divergences and $\hat R = 1.002$ in about 25 s, and
