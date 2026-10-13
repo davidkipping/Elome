@@ -356,6 +356,12 @@ class TransitModel:
                 raise ValueError("contact integration needs exp_time > 0")
             if transittype != "primary":
                 raise ValueError("contact integration is primary-transit only")
+            if supersample_factor > 1:
+                raise ValueError("supersample_factor is for "
+                                 "integration='supersample'; the contact rule "
+                                 "sets its accuracy with n_gl")
+            if int(n_gl) < 1:
+                raise ValueError(f"n_gl must be >= 1; got {n_gl}")
         self.integration = integration
         self.n_gl = int(n_gl)
         self.transittype = transittype
@@ -382,7 +388,7 @@ class TransitModel:
         self._stream = mx.cpu if self.dtype == mx.float64 else None
         # fused Metal kernel for fp32 GPU evaluation (falls back on its
         # own for fp64/CPU, so leaving this True is always safe)
-        self.use_metal = bool(use_metal)
+        self._use_metal = bool(use_metal)
 
         t = np.asarray(t, dtype=np.float64)
         self.t = t
@@ -410,6 +416,35 @@ class TransitModel:
         self._t_mx = mx.array(t_super - self._t_ref, dtype=self.dtype)
         self._compiled = {}
 
+    @property
+    def use_metal(self) -> bool:
+        """Whether float32 evaluation may use the fused Metal kernels."""
+        return self._use_metal
+
+    @use_metal.setter
+    def use_metal(self, value):
+        # the choice is baked into graphs as they are traced (a kernel or
+        # the graph core, per law and orbit), so a change drops them all
+        value = bool(value)
+        if value != self._use_metal:
+            self._compiled = {}
+        self._use_metal = value
+
+    def _require(self, get, names):
+        """Raise for a parameter left as None: batched or not, a missing
+        field must not become a plausible light curve."""
+        for name in names:
+            if get(name) is None:
+                raise ValueError(f"params.{name} is not set")
+
+    def _required_fields(self):
+        names = ["t0", "per", "rp", "a", "inc", "ecc", "w"]
+        if self.transittype == "secondary":
+            names.append("fp")
+        if self._oblate:
+            names.append("f")
+        return names
+
     # -- internals ---------------------------------------------------------
     #
     # light_curve runs through mx.compile'd graphs (kernel fusion is
@@ -433,11 +468,31 @@ class TransitModel:
             # fallback), not flux_dev, whose reverse mode is NaN at r = 0
             # and at r = 1, z = 0
             core = flux_dev_metal if self.use_metal else flux_dev_analytic
+            if core is flux_dev_metal and z_eff.ndim == 3:
+                # light_curves' contact rule: (n_sets, m, nodes) with (n, 1, 1)
+                # parameters. The kernel takes (n, m) with a value per row,
+                # so fold the node axis into the points (as _hybrid_dev does)
+                n = z_eff.shape[0]
+
+                def row(c):              # (n, 1): the kernel and the graph
+                    return (mx.reshape(c, (n, 1)) if isinstance(c, mx.array)
+                            and c.size == n else c)
+                dev = core(mx.reshape(z_eff, (n, -1)), row(rp), row(u1),
+                           row(u2))
+                return 1.0 + mx.reshape(dev, z_eff.shape)
             return 1.0 + core(z_eff, rp, u1, u2)
         z_eff = mx.where(front, z + 2.0 * (1.0 + rp), z)
         s0d, _, _ = sn_dev(z_eff, rp)
-        # visible fraction of the (uniform) planet disk
-        return 1.0 + fp * (1.0 + s0d / (math.pi * rp * rp))
+        # visible fraction of the (uniform) planet disk; rp = 0 is a point
+        # planet, always fully visible (0/0 otherwise; the safe denominator
+        # keeps the gradient finite there too)
+        if isinstance(rp, (int, float)):
+            if rp == 0.0:
+                return 1.0 + fp + 0.0 * z
+            return 1.0 + fp * (1.0 + s0d / (math.pi * rp * rp))
+        pos = rp > 0.0
+        den = mx.where(pos, math.pi * rp * rp, 1.0)
+        return 1.0 + fp * mx.where(pos, 1.0 + s0d / den, 1.0)
 
     def _hybrid_dev(self, z, rp, uvec):
         """F - 1 for a hybrid law on separations ``z``: the fused z-input
@@ -695,6 +750,7 @@ class TransitModel:
                 return cast(x) * (math.pi / 180.0)
             return cast(math.radians(float(x)))   # on the host, in fp64
 
+        self._require(lambda k: getattr(params, k), self._required_fields())
         if self._oblate:
             return self._oblate_eval(params, uv, cast, rad, is_arr)
 
@@ -933,8 +989,12 @@ class TransitModel:
             if not seq:
                 raise ValueError("no parameter sets given")
             cols = {}
+            for p in seq:
+                self._require(lambda k: getattr(p, k), self._required_fields())
             for k in self._batch_keys:
                 vals = [getattr(p, k) for p in seq]
+                # only optional fields are None here: fp of a primary
+                # transit, theta of an oblate planet
                 cols[k] = np.array([0.0 if v is None else float(v)
                                     for v in vals], dtype=np.float64)
             rows = []
@@ -950,6 +1010,7 @@ class TransitModel:
             _check_geometry_cols(cols)
             return cols, u
         p = params_seq                       # array-valued TransitParams
+        self._require(lambda k: getattr(p, k), self._required_fields())
         u = self._check_law(p, sets=True)    # (1 or n_sets, N)
         # the coefficient count, as the sequence path's _ld_coeffs checks it
         # (a quadratic u of 3 entries was silently truncated, 1 entry gave

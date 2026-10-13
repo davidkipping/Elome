@@ -279,3 +279,104 @@ def test_failed_metal_probe_warns_and_can_reprobe(monkeypatch):
         assert M.metal_available(reprobe=True) is False
     monkeypatch.undo()
     assert M.metal_available(reprobe=True) == metal_available()
+
+
+# ---------------------------------------------------------------------------
+# package review: regressions
+# ---------------------------------------------------------------------------
+
+_T = np.linspace(-0.1, 0.1, 51)
+_needs_gpu = pytest.mark.skipif(not metal_available(),
+                                reason="needs a usable Metal device")
+
+
+@pytest.mark.parametrize("field", ["t0", "per", "rp", "a", "inc"])
+def test_a_missing_field_raises_on_every_path(field):
+    """light_curves turned a None field into 0.0 -- rp=None gave a flat
+    curve, t0=None silently meant t0 = 0 -- where light_curve raised."""
+    m = elome.TransitModel(_mp(), _T)
+    bad = _mp(**{field: None})
+    with pytest.raises(ValueError, match=f"params.{field} is not set"):
+        m.light_curve(bad)
+    with pytest.raises(ValueError, match=f"params.{field} is not set"):
+        m.light_curves([_mp(), bad])
+    arr = _mp(rp=np.array([0.10, 0.11]))
+    setattr(arr, field, None)
+    with pytest.raises(ValueError, match=f"params.{field} is not set"):
+        m.light_curves(arr)
+
+
+def test_secondary_eclipse_needs_fp_at_every_call():
+    """fp was checked at construction only; a later fp=None gave a flat
+    eclipse (fp = 0) without an error."""
+    m = elome.TransitModel(_mp(fp=1e-3), 1.35 + _T, transittype="secondary")
+    with pytest.raises(ValueError, match="params.fp is not set"):
+        m.light_curve(_mp(fp=None))
+    with pytest.raises(ValueError, match="params.fp is not set"):
+        m.light_curves([_mp(fp=1e-3), _mp(fp=None)])
+    # a primary transit does not read fp: None stays fine there
+    assert np.isfinite(elome.TransitModel(_mp(), _T).light_curve(_mp())).all()
+
+
+@pytest.mark.parametrize("dtype", [mx.float64, mx.float32])
+def test_secondary_eclipse_of_a_point_planet(dtype):
+    """rp = 0 divided 0 by 0 everywhere; a point planet is never hidden,
+    so the flux is 1 + fp throughout, with finite gradients."""
+    t2 = 1.35 + _T
+    m = elome.TransitModel(_mp(fp=1e-3), t2, transittype="secondary", dtype=dtype)
+    f = m.light_curve(_mp(rp=0.0, fp=1e-3))
+    np.testing.assert_allclose(f, 1.0 + 1e-3, rtol=0, atol=1e-7)
+    np.testing.assert_allclose(m.light_curves([_mp(rp=0.0, fp=1e-3)])[0], f,
+                               rtol=0, atol=1e-7)
+    if dtype == mx.float64:
+        with mx.stream(mx.cpu):
+            def total(rp):
+                q = _mp(fp=1e-3)
+                q.rp = rp
+                return mx.sum(m.light_curve_mx(q))
+            g = mx.grad(total)(mx.array(0.0, dtype=mx.float64))
+        assert np.isfinite(float(g))
+
+
+def test_contradictory_exposure_options_raise():
+    with pytest.raises(ValueError, match="supersample_factor is for"):
+        elome.TransitModel(_mp(), _T, integration="contact", exp_time=0.02,
+                           supersample_factor=10)
+    for n_gl in (0, -3):
+        with pytest.raises(ValueError, match="n_gl must be >= 1"):
+            elome.TransitModel(_mp(), _T, integration="contact",
+                               exp_time=0.02, n_gl=n_gl)
+
+
+@_needs_gpu
+@pytest.mark.parametrize("law,u", [("quadratic", [0.4, 0.25]),
+                                   ("hybrid2", [0.3, 0.2])])
+def test_use_metal_takes_effect_after_first_use(law, u):
+    """The choice was baked into graphs at their first trace, so turning it
+    off later changed nothing for most laws. Now every graph is rebuilt."""
+    p = _mp(limb_dark=law, u=u)
+    m = elome.TransitModel(p, _T, dtype=mx.float32)
+    m.light_curve(p)
+    m.use_metal = False
+    off = elome.TransitModel(p, _T, dtype=mx.float32, use_metal=False)
+    np.testing.assert_array_equal(m.light_curve(p), off.light_curve(p))
+    m.use_metal = True
+    on = elome.TransitModel(p, _T, dtype=mx.float32)
+    np.testing.assert_array_equal(m.light_curve(p), on.light_curve(p))
+
+
+@_needs_gpu
+def test_batched_contact_rule_uses_the_kernel(monkeypatch):
+    """light_curves' contact rule hands the core (n, m, nodes) separations,
+    which flux_dev_metal sent to the graph fallback (about 4x slower)."""
+    import elome.metal as M
+
+    def no_graph(*a, **k):
+        raise AssertionError("fell back to the MLX graph")
+    p = _mp()
+    m = elome.TransitModel(p, _T, dtype=mx.float32, exp_time=0.02,
+                           integration="contact", n_gl=5)
+    ref = np.array([m.light_curve(_mp(rp=r)) for r in (0.09, 0.11)])
+    monkeypatch.setattr(M, "flux_dev_analytic", no_graph)
+    batch = _mp(rp=np.array([0.09, 0.11]))
+    np.testing.assert_allclose(m.light_curves(batch), ref, rtol=0, atol=5e-7)

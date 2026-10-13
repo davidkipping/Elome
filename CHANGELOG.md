@@ -5,6 +5,33 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.16.2] — 2026-10-13
+
+Fixes from a review of the package.
+
+### Fixed
+- **A missing parameter in `light_curves` became 0.** With `t0`, `per`,
+  `rp`, `a`, `inc`, `ecc` or `w` left as None, `light_curves` used 0
+  (a flat curve for `rp`, `t0 = 0` for `t0`) where `light_curve` raised.
+  Every path now raises `ValueError: params.<name> is not set`.
+- **Secondary eclipses** take `fp` at every call: a later `fp = None` gave a
+  flat eclipse; it now raises. At `rp = 0` the eclipse was NaN everywhere
+  (0/0); a point planet is now never hidden (flux 1 + fp, finite
+  gradients).
+- **Setting `use_metal` after the first evaluation** now takes effect for
+  every law, orbit and planet shape; it had reached only the quadratic
+  law's fused model kernel.
+- **`light_curves` with the contact rule in float32** fell back to the MLX
+  graph for the quadratic law instead of the fused kernel: now 3.8x
+  faster (256 sets x 2,000 points: 265 -> 70 ms); results agree to float32
+  rounding.
+- **Exposure options:** `supersample_factor > 1` with `integration="contact"`
+  (silently ignored before) and `n_gl < 1` now raise when the model is
+  built.
+- **Prior inverses at valid corners:** `u_to_q_np(0, 0)` and
+  `hybrid2_to_q_np` at the uniform disc, and `q_from_simplex_np` at a
+  simplex vertex, returned NaN; an undetermined coordinate is now 0.5.
+
 ### Documentation
 - Corrections from a review of the docs: the eccentric anvil model's
   parameter order (`secosw`, `sesinw` come before `df0`; `PARAM_NAMES`,

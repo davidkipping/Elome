@@ -146,9 +146,12 @@ class TestIntegrationWithTheRest:
         assert np.isfinite(f).all() and f.min() < 0.99
 
     def test_shape_is_one_value_per_exposure(self):
-        m, p = _model(exp_time=EXP, integration="contact", n_gl=7,
-                      supersample_factor=5)
+        m, p = _model(exp_time=EXP, integration="contact", n_gl=7)
         assert m.light_curve(p).shape == T.shape
+        # a supersample_factor would be ignored by the contact rule: refused
+        with pytest.raises(ValueError, match="supersample_factor is for"):
+            _model(exp_time=EXP, integration="contact", n_gl=7,
+                   supersample_factor=5)
 
     def test_parameters_update_without_rebuild(self):
         m, p = _model(exp_time=EXP, integration="contact", n_gl=7)

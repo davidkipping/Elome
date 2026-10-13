@@ -566,3 +566,35 @@ class TestPriors:
         for k in range(0, 20000, 1000):
             I = intensity_np(law, w[k], mu)
             assert (I >= -1e-12).all() and (np.diff(I) >= -1e-12).all()
+
+
+class TestPriorInversesAtCorners:
+    """The inverse maps divided by zero at valid corners (a uniform disc, a
+    simplex vertex), so a sampler started there began at NaN."""
+
+    def test_uniform_disc(self):
+        from elome import hybrid2_to_q_np, u_to_q_np
+        q1, q2 = u_to_q_np(0.0, 0.0)
+        assert (q1, q2) == (0.0, 0.5)
+        q1, q2 = hybrid2_to_q_np(0.0, 0.0)
+        assert q1 == 0.0 and q2 == 0.5
+        q1, q2 = u_to_q_np(np.array([0.0, 0.4]), np.array([0.0, 0.25]))
+        assert np.isfinite(q2).all() and q2[0] == 0.5
+
+    @pytest.mark.parametrize("w", [[1, 0, 0, 0], [0.5, 0.5, 0, 0],
+                                   [0, 0, 0, 1], [0, 0, 0, 0, 0]])
+    def test_simplex_vertices_round_trip(self, w):
+        from elome import q_from_simplex_np, simplex_from_q_np
+        q = q_from_simplex_np(w)
+        assert np.isfinite(q).all() and ((q >= 0) & (q <= 1)).all()
+        # the forward map clamps q >= 1e-12 (a finite gradient), so a vertex
+        # is reached to within (1e-12)^(1/n) ~ 1e-3, not exactly
+        np.testing.assert_allclose(simplex_from_q_np(q), w, atol=2e-3)
+
+    def test_interior_unchanged(self):
+        from elome import q_from_simplex_np, simplex_from_q_np, u_to_q_np
+        w = np.array([0.2, 0.2, 0.1, 0.1])
+        np.testing.assert_allclose(simplex_from_q_np(q_from_simplex_np(w)), w,
+                                   atol=1e-15)
+        q1, q2 = u_to_q_np(0.4, 0.25)
+        assert q1 == pytest.approx(0.4225) and q2 == pytest.approx(0.4 / 1.3)

@@ -48,12 +48,14 @@ def q_to_u_np(q1, q2):
 def u_to_q_np(u1, u2):
     """Inverse map (host-side, for building initial states from u guesses).
 
-    q1 = (u1 + u2)^2, q2 = u1 / (2 (u1 + u2)).
+    q1 = (u1 + u2)^2, q2 = u1 / (2 (u1 + u2)). At the uniform disc,
+    u1 = u2 = 0, every q2 maps to the same u, and 0.5 is returned.
     """
     u1 = np.asarray(u1, dtype=np.float64)
     u2 = np.asarray(u2, dtype=np.float64)
     s = u1 + u2
-    return s * s, 0.5 * u1 / s
+    q2 = np.divide(0.5 * u1, s, out=np.full(np.shape(s), 0.5), where=s != 0.0)
+    return s * s, q2[()]
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +131,9 @@ def hybrid2_to_q_np(w1, w2, eps=None, law=None):
                   np.asarray(w2, dtype=np.float64)], axis=-1)
     sol = np.linalg.solve(M, w[..., None])[..., 0]
     s, sq2 = sol[..., 0], sol[..., 1]
-    return s * s, sq2 / s
+    # at the uniform disc (w = 0, s = 0) every q2 maps to the same w: 0.5
+    q2 = np.divide(sq2, s, out=np.full(np.shape(s), 0.5), where=s != 0.0)
+    return s * s, q2[()]
 
 
 def simplex_from_q(q: mx.array) -> mx.array:
@@ -162,13 +166,19 @@ def simplex_from_q_np(q):
 
 
 def q_from_simplex_np(w):
-    """Inverse of simplex_from_q_np (host-side, for initial states)."""
+    """Inverse of simplex_from_q_np (host-side, for initial states).
+
+    Once the stick is used up (sum w = 1 reached before the last weight),
+    the remaining q are undetermined -- every value maps to the same w --
+    and 0.5 is returned for them."""
     w = np.asarray(w, dtype=np.float64)
     n = w.shape[-1]
     q = np.empty_like(w)
     stick = np.ones(w.shape[:-1])
     for j in range(n):
-        f = 1.0 - w[..., j] / stick
-        q[..., j] = f ** (n - j)
+        live = stick > 0.0
+        f = 1.0 - np.divide(w[..., j], stick, out=np.zeros_like(stick),
+                            where=live)
+        q[..., j] = np.where(live, f ** (n - j), 0.5)
         stick = stick * f
     return q
