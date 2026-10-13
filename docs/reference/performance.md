@@ -57,19 +57,19 @@ to 4,096 sets, with no memory cliff.
 Only Elómë and jaxoplanet are differentiable, and Elómë's gradients are
 analytic, fused into Metal kernels. For the gradient of a chunked
 log-likelihood at 1024 chains × 65,536 points, compiled, in float32
-(`examples/bench_vjp.py`):
+(`benchmarks/bench_vjp.py`, which records them in `benchmarks/vjp.json`):
 
 | | forward | value + gradient |
 |---|---:|---:|
-| reverse-mode automatic differentiation | 495 ms | 27,252 ms |
-| analytic gradient (MLX graph) | 498 ms | 618 ms |
-| **fused Metal kernel**, circular orbit | **21.8 ms** | **60.2 ms** |
-| **fused Metal kernel**, eccentric ($e = 0.3$) | **29.4 ms** | **76.2 ms** |
+| reverse-mode automatic differentiation | 492 ms | 31,264 ms |
+| analytic gradient (MLX graph) | 496 ms | 627 ms |
+| **fused Metal kernel**, circular orbit | **19.5 ms** | **55.0 ms** |
+| **fused Metal kernel**, eccentric ($e = 0.3$) | **26.2 ms** | **68.7 ms** |
 
 The fused kernel keeps the whole model (orbit, Kepler solve and
 photometry) in registers, with about 12 bytes of memory traffic per
-point. That is 20 times faster than the same model as a compiled MLX graph,
-and about 450 times faster for the gradient than reverse-mode
+point. That is 25 times faster than the same model as a compiled MLX graph,
+and about 570 times faster for the gradient than reverse-mode
 differentiation. End to end, a 1024-chain ChEES-HMC
 injection-recovery fit runs at about 13 effective samples per second
 with no divergences.

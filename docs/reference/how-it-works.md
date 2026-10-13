@@ -31,7 +31,7 @@ uses the same solution's recursion.
 The photometric core has analytic derivatives with respect to $r$, $z$
 and the limb-darkening coefficients, written as MLX custom functions.
 They avoid reverse-mode differentiation's memory-bound backward pass,
-and are 40–450 times faster depending on the path.
+and are 50–570 times faster depending on the path.
 
 ## Orbits
 

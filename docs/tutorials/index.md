@@ -12,12 +12,6 @@ with their outputs, and the notebooks themselves are in the repository's
 
 `matplotlib` is optional: every cell also prints its numbers.
 
-```{note}
-Tutorial 2 uses **anvil-gp**, a Gaussian-process package that is not yet
-publicly released, so it can be read here but not yet run. The other two
-tutorials need only public packages.
-```
-
 Measured on an M2 Max, the two fits are healthy at the settings used:
 tutorial 1 reaches no divergences and $\hat R = 1.002$ in about 25 s, and
 tutorial 2's twelve-parameter joint fit reaches no divergences,

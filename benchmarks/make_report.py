@@ -123,7 +123,11 @@ if os.path.exists(bs_path):
         "cliff. PyTransit's numba batch streams ~1,950 curves/s at every "
         "size on 12 cores.\n")
 
-add("""
+_vjp = json.load(open(os.path.join(HERE, "vjp.json")))["median_ms"]
+VJP_SENTENCE = (f"{_vjp['metal_value_grad']:.1f} ms vs "
+                f"{_vjp['autodiff_value_grad'] / 1e3:.1f} s for reverse-mode autodiff at "
+                f"1024 x 65,536 — a\n~{round(_vjp['autodiff_value_grad'] / _vjp['metal_value_grad'], -1):.0f}x spread")
+add(f"""
 ## The eccentric comparison in one line
 
 Every code above solves Kepler's equation inside the timed region. At
@@ -138,9 +142,37 @@ documented for the circular case.
 
 Only Elómë and jaxoplanet are differentiable, and only Elómë
 ships analytic gradients, fused into a Metal backward kernel: value+gradient
-costs 60.2 ms vs 27.3 s for reverse-mode autodiff at 1024 x 65,536 — a
-~450x spread that is the number that matters for HMC sampling. batman,
+costs {VJP_SENTENCE} that is the number that matters for HMC sampling. batman,
 PyTransit, exoplanet-core (numpy layer), and ellc provide no gradients.
+
+## In-kernel exposure integration (512 chains x 5,000 points, M2 Max)
+
+`flux_dev_from_tau` against the route it replaces —
+`separation_circular` + `flux_dev_metal` + averaging the sub-exposure
+axis outside the kernel. Reproduce: `python benchmarks/bench_tau_kernel.py`.
+
+| route | evals/pt | forward | value+grad | peak MB (v+g) | max abs error |
+|---|---:|---:|---:|---:|---:|
+| expanded axis, n_sub=15 | 15 | 41.0 ms | 99.7 ms | 2776 | 1.6e-4 |
+| in-kernel supersample, n_sub=15 | 15 | 14.5 ms | 28.0 ms | 51 | 1.6e-4 |
+| in-kernel contact, n_gl=5 | 25 | 24.4 ms | 43.9 ms | 51 | 1.3e-7 |
+
+Error is against an fp64 contact-rule reference at n_gl = 12 — neither of
+the rules being compared, because scoring supersampling against a
+supersampled reference flatters it. The middle row is the same arithmetic
+as the first, so its 2.8x / 3.6x is purely the cost of materialising the
+sub-exposure axis in MLX: every forward intermediate and every gradient
+grid is n_sub times the light curve.
+
+At matched accuracy the gap is not a factor of three. Supersampling
+converges as O(1/N) on a kinked curve, so 1e-6 needs n_sub ~ 2,271 —
+which at 512 chains would ask for ~368 GB and page. Measured at 7 chains,
+where both routes stay resident:
+
+| matched to 1e-6 | forward | value+grad | peak MB |
+|---|---:|---:|---:|
+| expanded axis, n_sub=2271 | 59.0 ms | 176.5 ms | 1602 |
+| in-kernel contact, n_gl=5 | 1.9 ms (**30x**) | 3.1 ms (**57x**) | 10 (**161-517x**) |
 
 ## The batching rule for samplers
 

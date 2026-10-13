@@ -23,11 +23,11 @@ Measured, for 10,000 parameter sets of a 1,000-point light curve
 
 | strategy | wall time | per light curve |
 |---|---:|---:|
-| 10,000 separate calls (a Python loop) | about 2,000 ms | about 200 µs |
-| one batched call | about 3.5 ms | about 350 ns |
+| 10,000 separate calls (a Python loop) | about 2,400 ms | about 240 µs |
+| one batched call | about 2.9 ms | about 290 ns |
 
-The ratio moves between about 600 and 1,000 with the machine's state;
-the order of magnitude is the point. A per-walker loop makes Elómë the
+The ratio, about 800 here, moves by a few tens of per cent with the
+machine's state; the order of magnitude is the point. A per-walker loop makes Elómë the
 slowest code in any benchmark; a batched call makes it the fastest. If a
 call carries fewer than about $3\times10^4$ points in total, a CPU code
 is genuinely faster: batch harder, or use the float64 path.

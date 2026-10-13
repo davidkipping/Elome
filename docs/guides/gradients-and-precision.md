@@ -89,11 +89,15 @@ dtype, is differentiable, and compiles.
 (long-baselines)=
 ## Long baselines in float32
 
-In float32, the orbital phase of a time many orbits from `t0` loses
-precision. Measured through the frontend for $P = 10$ days and
-$r_p = 0.1$ on a circular orbit (`benchmarks/verify_doc_claims.py`), the
-maximum flux error is $2\times10^{-7}$ after one orbit, $1.1\times10^{-5}$
-after 100, and $1.7\times10^{-4}$ after 1,000.
+In float32, the orbital phase loses precision when the data span many
+orbits. The frontend re-centres the times on their midpoint in float64,
+so absolute times and a distant `t0` cost nothing, but float32 still
+sees times up to half the data's span. Measured through the frontend
+for $P = 10$ days and $r_p = 0.1$ on a circular orbit, with transits at
+both ends of the span (`benchmarks/verify_doc_claims.py`), the maximum
+flux error is $2.7\times10^{-7}$ for a span of one orbit,
+$1.6\times10^{-5}$ for 100, and $2.6\times10^{-4}$ for 1,000. For
+long baselines in float32, use the models below, or float64.
 
 The fix is to split each time, in float64 on the host, into an orbit
 number and a residual within the orbit, which is what

@@ -397,10 +397,11 @@ checks are worth the time:
 
 1. **Run a second, gradient-free sampler** and compare. A wrong gradient
    anywhere in the chain — transit model, GP likelihood, or the transform —
-   moves the ChEES posterior but not the ensemble's. Done for this fit, the
-   two agree on every median to 0.04 sigma and every width to 2%. It is not
-   repeated here only because the ensemble needs thousands of iterations to
-   decorrelate, which would dominate this notebook's runtime.
+   moves the ChEES posterior but not the ensemble's. Run on a full-size
+   version of this fit, the two agree on every median to 0.04 sigma and
+   every width to 2%. It is not repeated here, at this notebook's smaller
+   settings, because the ensemble needs thousands of iterations to
+   decorrelate, which would dominate the runtime.
 2. **Check the GP did not eat the transit.** If `gp_sigma` drifts up toward
    the transit depth while `r` drifts down, the two are trading. Comparing the
    recovered depth against a white-noise-only fit of the same data is a quick

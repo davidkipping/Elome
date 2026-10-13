@@ -43,9 +43,10 @@ error in the table.
 
 - **Exposure integration.** The contact rule converges as it does for a
   planet, but its absolute error scales with the eclipse depth. For a
-  *total* eclipse ($b < r_p - 1$, 100% deep; not the grazing example
-  above), a 2-minute exposure of an 8-minute eclipse is accurate to about
-  $10^{-5}$ at `n_gl = 5` and to below $10^{-6}$ at `n_gl = 9`.
+  *total* eclipse of the same system ($b = 3$: 100% deep for 10.6
+  minutes, 14.8 minutes from first to last contact; not the grazing
+  example above), 2-minute exposures are accurate to about $10^{-5}$ at
+  `n_gl = 5` and to below $10^{-6}$ at `n_gl = 9`.
 - **Sampler bounds.** The ready-made anvil targets bound `r` to
   $[0.005, 0.5]$, `b` to $[0, 1.2]$ and `a` to $[1.5, 200]$ by default
   (`elome.anvil.DEFAULT_BOUNDS`). For a

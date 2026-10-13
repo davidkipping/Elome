@@ -41,10 +41,10 @@ Every code solves Kepler's equation itself; the oracle's separation comes from a
 | code (threads) | N=1,000 | N=10,000 | N=100,000 | N=1,000,000 | N=10,000,000 |
 |---|---:|---:|---:|---:|---:|
 | batman (1) | 0.02 ms | 0.20 ms | 1.92 ms | 18.91 ms | 193.80 ms |
-| exoplanet (1) | 0.04 ms | 0.29 ms | 2.82 ms | 29.79 ms | 318.36 ms |
-| jaxoplanet (all) | 0.13 ms | 0.56 ms | 2.10 ms | 20.19 ms | 182.95 ms |
 | elome_fp32 (all) | 0.34 ms | 0.34 ms | 0.42 ms | 1.13 ms | 9.76 ms |
 | elome_fp64 (all) | 0.42 ms | 1.65 ms | 14.29 ms | 129.14 ms | 1,291.77 ms |
+| exoplanet (1) | 0.04 ms | 0.29 ms | 2.82 ms | 29.79 ms | 318.36 ms |
+| jaxoplanet (all) | 0.13 ms | 0.56 ms | 2.10 ms | 20.19 ms | 182.95 ms |
 | pytransit (1) | 0.04 ms | 0.36 ms | 3.55 ms | 35.72 ms | 360.43 ms |
 | pytransit (4) | 0.04 ms | 0.36 ms | 3.55 ms | 35.71 ms | 359.28 ms |
 | pytransit (8) | 0.04 ms | 0.36 ms | 3.59 ms | 35.76 ms | 358.83 ms |
@@ -57,10 +57,10 @@ Orbit-inclusive: each code's own Kepler solver is inside the timed region.
 | code (threads) | N=1,000 | N=10,000 | N=100,000 | N=1,000,000 | N=10,000,000 |
 |---|---:|---:|---:|---:|---:|
 | batman (1) | 0.02 ms | 0.19 ms | 2.05 ms | 20.36 ms | 207.14 ms |
-| exoplanet (1) | 0.07 ms | 0.53 ms | 5.60 ms | 62.09 ms | 635.40 ms |
-| jaxoplanet (all) | 0.19 ms | 0.94 ms | 3.64 ms | 34.62 ms | 343.93 ms |
 | elome_fp32 (all) | 0.42 ms | 1.09 ms | 1.20 ms | 2.27 ms | 15.31 ms |
 | elome_fp64 (all) | 0.62 ms | 2.14 ms | 17.88 ms | 172.20 ms | 1,740.08 ms |
+| exoplanet (1) | 0.07 ms | 0.53 ms | 5.60 ms | 62.09 ms | 635.40 ms |
+| jaxoplanet (all) | 0.19 ms | 0.94 ms | 3.64 ms | 34.62 ms | 343.93 ms |
 | pytransit (1) | 0.04 ms | 0.38 ms | 3.99 ms | 40.48 ms | 394.62 ms |
 | pytransit (4) | 0.04 ms | 0.39 ms | 3.77 ms | 39.84 ms | 403.05 ms |
 | pytransit (8) | 0.05 ms | 0.41 ms | 4.05 ms | 40.12 ms | 398.46 ms |
@@ -104,8 +104,8 @@ documented for the circular case.
 
 Only Elómë and jaxoplanet are differentiable, and only Elómë
 ships analytic gradients, fused into a Metal backward kernel: value+gradient
-costs 60.2 ms vs 27.3 s for reverse-mode autodiff at 1024 x 65,536 — a
-~450x spread that is the number that matters for HMC sampling. batman,
+costs 55.0 ms vs 31.3 s for reverse-mode autodiff at 1024 x 65,536 — a
+~570x spread that is the number that matters for HMC sampling. batman,
 PyTransit, exoplanet-core (numpy layer), and ellc provide no gradients.
 
 ## In-kernel exposure integration (512 chains x 5,000 points, M2 Max)
