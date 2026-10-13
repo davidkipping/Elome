@@ -3,19 +3,22 @@
 # Uses PyPI trusted publishing: no API token is stored anywhere. PyPI
 # accepts the upload because it comes from this workflow, in this
 # repository, in the `pypi` environment, as registered on pypi.org.
+# Running it by hand (workflow_dispatch) builds and checks the
+# distributions without uploading them.
 name: Publish to PyPI
 
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build the distributions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Build the sdist and wheel
@@ -24,10 +27,11 @@ jobs:
           python -m build
           python -m twine check --strict dist/*
       - name: Check the version matches the release tag
+        if: github.event_name == 'release'
         run: |
           tag="${GITHUB_REF_NAME#v}"
           ls dist/elome-"$tag"-py3-none-any.whl
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -35,6 +39,7 @@ jobs:
   publish:
     name: Upload to PyPI
     needs: build
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -42,7 +47,7 @@ jobs:
     permissions:
       id-token: write          # for trusted publishing
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
