@@ -814,6 +814,30 @@ inline void ob_eval(T x0, T y0, T A, T B, thread const ob_frozen &fz,
         // isolated roots: live Newton step, residue, continued log
         for (int q = 0; q < 4; ++q) {
             if (used[q]) continue;
+            if (cab(z0[q]) > OB_RECIP) {
+                // an outer root, taken through its partner w = 1/conj(z)
+                // inside the disc (N and D are self-reciprocal):
+                // N/D'(z) = -conj(N/D'(w)), and W/z = W conj(w). More
+                // accurate than z itself, and for a nearly circular
+                // planet (|z| ~ 2/(A f)) z's live tangents overflow fp32.
+                float m = cab(z0[q]);
+                float2 wf = (z0[q] / m) / m;
+                float S0f = t_val(S0), S2f = t_val(S2);
+                float2 S1f = c_val(S1);
+                for (int it = 0; it < 2; ++it)
+                    wf = wf - cdiv(ob_D(wf, S0f, S1f, S2f, p),
+                                   ob_dD(wf, S0f, S1f, S2f, p));
+                cx<T> w = ob_live(wf, S0, S1, S2, p);
+                cx<T> dDw = ob_dDt(w, S0, S1, S2, p);
+                if (ca2(c_val(dDw)) == 0.0f) continue;
+                cx<T> R = -c_i(c_conj(ob_Nt(w, K0, K1) / dDw));
+                cx<T> one = c_const<T>(float2(1.0f, 0.0f));
+                cx<T> a2 = one - c_const<T>(w2) * c_conj(w);
+                cx<T> a1 = one - c_const<T>(w1) * c_conj(w);
+                ell = ell + R * cx<T>(c_logabs(a2) - c_logabs(a1),
+                                      c_arg(a2) - c_arg(a1));
+                continue;
+            }
             cx<T> z = ob_live(z0[q], S0, S1, S2, p);
             cx<T> dD = ob_dDt(z, S0, S1, S2, p);
             if (ca2(c_val(dD)) == 0.0f) continue;
@@ -941,6 +965,7 @@ _OB_CONST = {
     "OB_PAIRTOL": "1e-3f", "OB_PAIRRATIO": "0.1f", "OB_FSW": _f(_F_SW32),
     "OB_DEFL": "1.2e-7f", "OB_ATOL": "2.4e-7f", "OB_RTOL": "3e-5f",
     "OB_VTOL": "1e-4f", "OB_PAIRPOLISH": "2", "OB_NEWTON": "6", "OB_FERRARI": "3e-3f",
+    "OB_RECIP": "2.0f",
 }
 
 

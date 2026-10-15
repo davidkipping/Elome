@@ -87,4 +87,4 @@ __all__ = [
     "sn_dev_with_aux",
 ]
 
-__version__ = "0.16.3"
+__version__ = "0.16.4"

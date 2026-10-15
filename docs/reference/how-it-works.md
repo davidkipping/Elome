@@ -84,7 +84,12 @@ iterations, and checks them against the residual and Vieta's relations.
 For a nearly circular planet, where the closed form loses precision in
 float32 (its leading coefficient is proportional to the flattening),
 and for any quartic that fails the check, the seeds come instead from
-its own small eigenvalue solver (Metal has no linear algebra). The contact times for exposure integration are solved per
+its own small eigenvalue solver (Metal has no linear algebra). The
+roots come in pairs $(z, 1/\bar z)$, and the term of a root well outside
+the unit circle is evaluated through its partner inside it. That is
+exact and better conditioned; for a nearly circular planet one root is
+of order $2/(A f)$, and its derivatives taken directly would overflow
+float32. The contact times for exposure integration are solved per
 side with a monotone Newton iteration on convex distance functions, and
 a separate kernel computes them.
 

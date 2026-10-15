@@ -5,6 +5,20 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.16.4] — 2026-10-15
+
+### Fixed
+- **NaN gradients for small, nearly circular oblate planets in float32.**
+  For flattening just above the spherical switch (f = 1e-5) and a small
+  planet (r f below about 1.5e-7: an Earth-sized planet with f < 2e-5,
+  any planet with r < 0.013 at f = 1e-5), d/dr and d/df were NaN at every
+  partial-transit point. One root of each pole's quartic sits at
+  |z| ~ 2/(A f), and its derivative step overflowed float32. Each root
+  outside the unit circle (|z| > 2) is now evaluated through its partner
+  1/conj(z) inside it, which is exact and better conditioned: gradients
+  are finite everywhere down to r = 1e-5, and d/dr and d/df are closer to
+  the float64 reference across the oblate domain.
+
 ## [0.16.3] — 2026-10-15
 
 ### Changed

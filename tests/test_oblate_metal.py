@@ -125,6 +125,33 @@ def test_device_gradient_matches_fp64_autodiff(law):
     assert (np.abs(gk - gg) <= 1e-3 * gmax + 5e-4).all()
 
 
+@pytest.mark.parametrize("law", ["hybrid2", "hybrid5"])
+def test_device_gradient_small_nearly_circular_planets(law):
+    """Small planets just above the switch, r down to 1e-5: one root of
+    the quartic sits at |z| ~ 2/(A f), up to ~1e10, and is taken through
+    its reciprocal partner. Taken directly, its live tangents overflow
+    fp32 (d/dr and d/df were NaN in partial transit for r f < ~1.5e-7).
+    Finite down to r = 1e-5; compared from r = 1e-4, below which fp32
+    positions near the limb resolve the planet only to ~1e-3 of its size."""
+    rng = np.random.default_rng(4)
+    n = 2000
+    r = 10 ** rng.uniform(-5, math.log10(0.02), n)
+    f = 10 ** rng.uniform(math.log10(1.02 * F_SW), -4, n)
+    A = r / np.sqrt(1 - f)
+    d = np.where(rng.random(n) < 0.75, 1 + A * rng.uniform(-0.99, 0.99, n),
+                 rng.uniform(0, 1 - A, n))
+    t = rng.uniform(0, 2 * np.pi, n)
+    X, Y, th = d * np.cos(t), d * np.sin(t), rng.uniform(0, np.pi, n)
+    wct = rng.normal(size=(n, LAWS[law].n_col))
+    _, gk = MO._point_cols(X, Y, r, f, th, law, wct, grad=True)
+    _, gg = graph_cols(X, Y, r, f, th, law, wct)
+    assert np.isfinite(gk).all()
+    big = r >= 1e-4
+    err = np.abs(gk - gg)[big] / np.abs(gg).max(1, keepdims=True)[big]
+    assert np.median(err) < 1e-5
+    assert err.max() < 5e-2
+
+
 # ---------------------------------------------------------------------------
 # the tau kernels against the fp64 graph
 # ---------------------------------------------------------------------------
