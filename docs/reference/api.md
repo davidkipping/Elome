@@ -646,9 +646,7 @@ s = q1^(1/4), then stick-breaking over the four shapes:
     w = s (1 - a,  a (1 - b),  a b (1 - q4),  a b q4),
     a = q2^(1/3),  b = q3^(1/2).
 
-Not ``simplex_from_q``, which draws w1 first: both are uniform on the
-simplex but give different w for the same q. MLX ops; q clamped away
-from 0 for a finite gradient.
+MLX ops; q clamped away from 0 for a finite gradient.
 ```
 
 ### `hybrid4_from_q_np`

@@ -83,10 +83,7 @@ is easy, onto a region of physical profiles, uniformly:
 
 For `hybrid4`, $q_1$–$q_4$ are the direct analogue of Kipping's $q_1$,
 $q_2$: $q_1 = (1 - I(0))^4$ sets the centre-to-limb drop, and the others
-divide it among the four shapes. Do not use `simplex_from_q` for
-`hybrid4`: it covers the same simplex but gives different weights for
-the same $q$, so its $q$ would not match published `hybrid4`
-coefficients.
+divide it among the four shapes.
 
 Each map has an MLX version, which is differentiable and suited to
 sampling, and a numpy version with the `_np` suffix:

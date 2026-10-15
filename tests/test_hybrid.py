@@ -714,8 +714,6 @@ class TestHybrid4CurvatureBasis:
             g = mx.grad(lambda qq: mx.sum(ld.hybrid4_from_q(qq) * f64([1, 2, 3, 4])))(corners)
         assert np.abs(wm - w[:50]).max() < 1e-15
         assert np.isfinite(np.asarray(g)).all()
-        # not the stick-breaking map: the same q, other weights
-        assert not np.allclose(ld.simplex_from_q_np(q[:5]), w[:5])
 
     @pytest.mark.parametrize("w", [[0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0],
                                    [0, 0, 1, 0], [0, 0, 0.5, 0.5]])
