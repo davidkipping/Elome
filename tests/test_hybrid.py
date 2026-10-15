@@ -46,6 +46,19 @@ def intensity_np(law, w, mu):
     return out
 
 
+def law_shapes(law, mu):
+    """The law's shapes on a mu grid, built from first principles: the
+    terms T (even shapes, then Pi_eps per pole), mixed by ``law.mix``."""
+    m2 = np.asarray(mu, dtype=np.float64) ** 2
+    T = [a[0] + a[1] * m2 + a[2] * m2 ** 2 for a in law.shapes]
+    for e in law.eps:
+        N = e ** -2 - (1 + e) ** -2
+        T.append(((m2 + e) ** -2 - (1 + e) ** -2) / N)
+    if law.mix is None:
+        return T
+    return [sum(c * t for c, t in zip(row, T)) for row in law.mix]
+
+
 def phys_w(law, seed):
     """A weight vector inside the physical region (triangle / simplex),
     chosen by the law's structure (hybrid_weights)."""
@@ -134,13 +147,7 @@ class TestDefinitions:
         law = LAWS[name]
         w = phys_w(law, 2)
         mu = np.linspace(0.0, 1.0, 101)
-        m2 = mu ** 2
-        T = []
-        for a in law.shapes:
-            T.append(a[0] + a[1] * m2 + a[2] * m2 ** 2)
-        for e in law.eps:
-            N = e ** -2 - (1 + e) ** -2
-            T.append(((m2 + e) ** -2 - (1 + e) ** -2) / N)
+        T = law_shapes(law, mu)
         for t in T:
             assert abs(t[0] - 1.0) < 1e-12 and abs(t[-1]) < 1e-12
         shape = 1.0 - sum(wj * tj for wj, tj in zip(w, T))
@@ -152,14 +159,8 @@ class TestDefinitions:
         law = LAWS[name]
         N = hybrid_norms(law)
         assert abs(N[0] - math.pi) < 1e-15
-        m2 = lambda x: 1 - x * x
-        shapes = [lambda x, a=a: a[0] + a[1] * m2(x) + a[2] * m2(x) ** 2
-                  for a in law.shapes]
-        for e in law.eps:
-            Ne = e ** -2 - (1 + e) ** -2
-            shapes.append(lambda x, e=e, Ne=Ne: ((m2(x) + e) ** -2
-                                                 - (1 + e) ** -2) / Ne)
-        for j, Tj in enumerate(shapes):
+        for j in range(law.n_w):
+            Tj = lambda x, j=j: float(law_shapes(law, float(x))[j])
             full = float(2 * mp.pi * mp.quad(lambda x: Tj(x) * x, [0, 1]))
             assert abs(N[j + 1] - full) < 1e-13, j
 
@@ -412,7 +413,9 @@ class TestGradients:
         Everywhere except the two max/min ties z == r and z == 1 of the
         Kahan sort in _kite_sqarea, where MLX's autodiff splits the
         gradient at the tie (measure zero; the analytic partials there
-        are the ones that match finite differences)."""
+        are the ones that match finite differences). 2e-11: hybrid4's curvature
+        shapes mix the generators with coefficients up to 1.34 (measured
+        1.1e-11; hybrid2, hybrid5 under 8e-12)."""
         law = LAWS[name]
         for r in (0.05, 0.3):
             zs = z_grid(r, law)
@@ -429,9 +432,9 @@ class TestGradients:
                         argnums=(0, 1))(f64(zs), f64(r))
                     mx.eval(gz, gr_tot)
                     s = np.abs(np.asarray(dz)[:, j]).max() + 1e-12
-                    assert np.abs(np.asarray(gz) - np.asarray(dz)[:, j]).max() / s < 1e-11, j
+                    assert np.abs(np.asarray(gz) - np.asarray(dz)[:, j]).max() / s < 2e-11, j
                     s = np.abs(np.asarray(dr)[:, j]).sum() + 1e-12
-                    assert abs(float(gr_tot) - float(np.asarray(dr)[:, j].sum())) / s < 1e-11, j
+                    assert abs(float(gr_tot) - float(np.asarray(dr)[:, j].sum())) / s < 2e-11, j
 
     @pytest.mark.parametrize("name", NAMES)
     def test_partials_continuous_across_switches(self, name):
@@ -598,3 +601,131 @@ class TestPriorInversesAtCorners:
                                    atol=1e-15)
         q1, q2 = u_to_q_np(0.4, 0.25)
         assert q1 == pytest.approx(0.4225) and q2 == pytest.approx(0.4 / 1.3)
+
+
+class TestHybrid4CurvatureBasis:
+    """hybrid4's weights refer to its curvature basis S = B T, in which the
+    simplex w >= 0, sum w <= 1 is exactly the set of profiles in its span
+    with I >= 0, g >= 0, g' <= 0, g'' >= 0 on x = mu^2 in [0, 1]."""
+
+    B_REF = np.array([
+        [0.5, 0.5, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0006260842489149928, 0.001404013755411423, 1.020963273947444,
+         -0.02299337195177007],
+        [-0.08116019831892918, -0.2568535772254558, -0.0005906631447752816,
+         1.33860443868916]])
+
+    @staticmethod
+    def conditions(w, x):
+        """(I(0), min g, -max g', min g'') over x for weights w (..., 4):
+        all >= 0 iff the profile is positive, monotonic, concave in mu^2
+        and of convex slope in mu^2."""
+        S = HYBRID4.generator_matrix()          # rows over [1, x, x^2, P0, P1]
+        coef = -(np.atleast_2d(w) @ S)
+        coef[:, 0] += 1.0
+        c0, c1, c2 = coef[:, 0:1], coef[:, 1:2], coef[:, 2:3]
+        d = coef[:, 3:]
+        e = np.array(HYBRID4.eps)
+        xe = x[None, :, None] + e
+        I0 = (c0[:, 0] + (d / e ** 2).sum(-1))
+        g = c1 + 2 * c2 * x - 2 * (d[:, None, :] * xe ** -3).sum(-1)
+        g1 = 2 * c2 + 6 * (d[:, None, :] * xe ** -4).sum(-1)
+        g2 = -24 * (d[:, None, :] * xe ** -5).sum(-1)
+        return I0, g.min(1), -g1.max(1), g2.min(1)
+
+    def test_basis_and_check_values(self):
+        assert np.abs(H.HYBRID4_BASIS - self.B_REF).max() < 1e-15
+        assert np.array_equal(H.hybrid4_basis(H.HYBRID4_EPS), H.HYBRID4_BASIS)
+        assert np.array_equal(np.array(HYBRID4.mix), H.HYBRID4_BASIS)
+        w = ld.hybrid4_from_q_np([0.5, 0.5, 0.5, 0.5])
+        np.testing.assert_allclose(
+            w, [0.1734764882, 0.1954827707, 0.2359685782, 0.2359685782], atol=1e-10)
+        np.testing.assert_allclose(
+            w @ H.HYBRID4_BASIS,
+            [0.0677347237, 0.2219429445, 0.2407758742, 0.3104428728], atol=1e-10)
+
+    def test_vertices(self):
+        """w = e_k gives I = 1 - S_k: S1 = 1 - mu^2, S2 = (1 - mu^2)^2
+        exactly; each vertex is physical; S3, S4 have I(0) = 0 and
+        g(1) = g'(1) = 0."""
+        mu = np.linspace(0, 1, 101)
+        np.testing.assert_allclose(intensity_np(HYBRID4, [1, 0, 0, 0], mu), mu ** 2, atol=1e-15)
+        np.testing.assert_allclose(intensity_np(HYBRID4, [0, 1, 0, 0], mu),
+                                   1 - (1 - mu ** 2) ** 2, atol=1e-15)
+        x = np.linspace(0, 1, 2001)
+        for k in range(4):
+            w = np.eye(4)[k]
+            assert all((c >= -1e-12).all() for c in self.conditions(w, x)), k
+            assert abs(intensity_np(HYBRID4, w, 0.0)) < 1e-12
+        for k in (2, 3):
+            S = HYBRID4.generator_matrix()[k]
+            e = np.array(HYBRID4.eps)
+            g1 = S[1] + 2 * S[2] - 2 * (S[3:] * (1 + e) ** -3).sum()
+            gp1 = 2 * S[2] + 6 * (S[3:] * (1 + e) ** -4).sum()
+            assert abs(g1) < 1e-12 and abs(gp1) < 1e-12
+
+    def test_simplex_is_exactly_the_physical_region(self):
+        """Precision and recall: over a box around the simplex, a weight
+        vector meets the four conditions if and only if it is in the
+        simplex (points within 0.01 of a facet excluded)."""
+        rng = np.random.default_rng(7)
+        w = rng.uniform(-0.3, 1.1, (40000, 4))
+        slack = np.minimum(w.min(1), 1 - w.sum(1))
+        keep = np.abs(slack) > 0.01
+        w, inside = w[keep], slack[keep] > 0
+        x = np.linspace(0, 1, 2001)
+        ok = np.ones(len(w), bool)
+        for chunk in range(0, len(w), 5000):
+            conds = self.conditions(w[chunk:chunk + 5000], x)
+            ok[chunk:chunk + 5000] = np.all([c >= 0 for c in conds], axis=0)
+        assert inside.sum() > 300 and (~inside).sum() > 300
+        assert np.array_equal(ok, inside)
+
+    def test_same_light_curves_as_the_term_basis(self):
+        """hybrid4 with curvature weights w is the term-basis law with
+        weights w @ B: the same profile, the same light curve."""
+        term = HybridLaw("hybrid4_terms", HYBRID4.eps, HYBRID4.shapes)
+        assert term.definition != HYBRID4.definition
+        rng = np.random.default_rng(3)
+        for r in (0.05, 0.2):
+            zs = z_grid(r, HYBRID4)
+            for _ in range(3):
+                w = ld.hybrid4_from_q_np(rng.random(4))
+                with mx.stream(mx.cpu):
+                    a = np.asarray(flux_dev_hybrid(f64(zs), f64(r), w, HYBRID4))
+                    b = np.asarray(flux_dev_hybrid(f64(zs), f64(r), w @ H.HYBRID4_BASIS, term))
+                assert np.abs(a - b).max() < 1e-15
+
+    def test_prior_map(self):
+        rng = np.random.default_rng(4)
+        q = rng.random((20000, 4))
+        w = ld.hybrid4_from_q_np(q)
+        assert (w >= 0).all() and (w.sum(1) <= 1 + 1e-12).all()
+        assert np.allclose(w.mean(0), 0.2, atol=0.01)       # flat Dirichlet on 5 parts
+        assert np.abs(ld.hybrid4_to_q_np(w) - q).max() < 1e-10
+        with mx.stream(mx.cpu):
+            wm = np.asarray(ld.hybrid4_from_q(f64(q[:50])))
+            corners = f64([[0, 0, 0, 0], [1, 1, 1, 1], [1, 0, 1, 0]])
+            g = mx.grad(lambda qq: mx.sum(ld.hybrid4_from_q(qq) * f64([1, 2, 3, 4])))(corners)
+        assert np.abs(wm - w[:50]).max() < 1e-15
+        assert np.isfinite(np.asarray(g)).all()
+        # not the stick-breaking map: the same q, other weights
+        assert not np.allclose(ld.simplex_from_q_np(q[:5]), w[:5])
+
+    @pytest.mark.parametrize("w", [[0, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0],
+                                   [0, 0, 1, 0], [0, 0, 0.5, 0.5]])
+    def test_prior_inverse_at_corners(self, w):
+        q = ld.hybrid4_to_q_np(w)
+        assert np.isfinite(q).all() and ((q >= 0) & (q <= 1)).all()
+        # the forward map clamps q >= 1e-12, so corners are reached to ~1e-3
+        np.testing.assert_allclose(ld.hybrid4_from_q_np(q), w, atol=2e-3)
+
+    def test_mix_validation(self):
+        with pytest.raises(ValueError, match="mix must be 4 x 4"):
+            HybridLaw("bad", HYBRID4.eps, HYBRID4.shapes, mix=np.eye(3))
+        with pytest.raises(ValueError, match="invertible"):
+            HybridLaw("bad", HYBRID4.eps, HYBRID4.shapes, mix=np.zeros((4, 4)))
+        plain = HybridLaw("plain", HYBRID4.eps, HYBRID4.shapes, mix=np.eye(4))
+        assert plain.mix is None
+        assert plain.definition == HybridLaw("p2", HYBRID4.eps, HYBRID4.shapes).definition

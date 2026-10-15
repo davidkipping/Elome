@@ -15,7 +15,8 @@ term carries:
     I(mu) / I(1) = 1 - sum_j w_j T_j(mu),          I(0) / I(1) = 1 - sum_j w_j
 
     hybrid2 :  T = {1 - mu^2,  Pi_0.36}                            2 weights
-    hybrid4 :  T = {1 - mu^4,  (1 - mu^2)^2,  Pi_eps0, Pi_eps1}    4 weights
+    hybrid4 :  S = B T,  T = {1 - mu^4,  (1 - mu^2)^2,  Pi_eps0, Pi_eps1}
+                                                                   4 weights
     hybrid5 :  T = {1 - mu^4,  (1 - mu^2)^2,  Pi_eps0..2}          5 weights
 
     Pi_eps(mu) = [P_eps(mu) - (1 + eps)^-2] / N_eps,   N_eps = eps^-2 - (1 + eps)^-2,
@@ -27,8 +28,13 @@ and hybrid2's single pole at eps = 0.36, both tuned over PHOENIX and
 MPS-ATLAS models in 37 passbands in the hybrid-law coefficients paper (in
 preparation). Out of sample there (8,100 model-bands, median light-curve
 error) hybrid4 reaches 1.8 ppm and hybrid5 1.1 ppm, against 2.0 ppm for
-the Claret four-parameter law. The physical region is an exact triangle
-for hybrid2 and, for the others, the simplex w_j >= 0, sum w_j <= 1 (``ld.hybrid2_from_q``,
+the Claret four-parameter law. hybrid4's shapes S1..S4 are its curvature
+basis (``hybrid4_basis``: S1 = 1 - mu^2, S2 = (1 - mu^2)^2, S3, S4 pole-
+dominated), in which the simplex w_j >= 0, sum w_j <= 1 is *exactly* the
+set of its profiles that are positive, monotonic, concave in mu^2 and of
+convex slope in mu^2. The physical region is an exact triangle for hybrid2,
+that simplex for hybrid4, and for hybrid5 the simplex w_j >= 0,
+sum w_j <= 1 (``ld.hybrid2_from_q``, ``ld.hybrid4_from_q``,
 ``ld.simplex_from_q`` sample them uniformly).
 
 Why they are cheap here. The laws were designed so an *oblate* planet's
@@ -98,7 +104,8 @@ from .solution import _kite_sqarea
 from .dtypes import fp64_on_cpu
 
 __all__ = ["HybridLaw", "HYBRID2", "HYBRID4", "HYBRID5", "LAWS",
-           "HYBRID2_EPS", "HYBRID4_ALPHA", "HYBRID4_EPS", "ladder",
+           "HYBRID2_EPS", "HYBRID4_ALPHA", "HYBRID4_EPS", "HYBRID4_BASIS",
+           "hybrid4_basis", "ladder",
            "find_law", "get_law", "hybrid_norms", "w_to_c",
            "shape_cols", "flux_dev_hybrid", "combine_cols", "shape_partials",
            "even_cols", "pole_col", "lens_geometry"]
@@ -140,17 +147,23 @@ def ladder(K: int, alpha_eff: float = 1.0) -> tuple:
 
 @dataclass(frozen=True)
 class HybridLaw:
-    """A named law: its poles and its even shape terms.
+    """A named law: its poles and its shape terms.
 
     ``shapes`` holds the even shape terms as (a0, a1, a2) coefficients over
     the monomial columns (mu^0, mu^2, mu^4): (1, -1, 0) is 1 - mu^2,
     (1, 0, -1) is 1 - mu^4, (1, -2, 1) is (1 - mu^2)^2. The pole shapes
-    Pi_eps follow, one per entry of ``eps``, in that order. Weights are
-    ordered (even shapes..., pole shapes...), as in the notes.
+    Pi_eps follow, one per entry of ``eps``, in that order: together they
+    are the terms T = (even shapes..., pole shapes...).
+
+    ``mix`` (optional, n_w x n_w, invertible) makes the law's shapes the
+    combinations S_k = sum_j mix[k][j] T_j, and its weights refer to those:
+    I/I(1) = 1 - sum_k w_k S_k. Without it the shapes are T themselves.
+    hybrid4's ``mix`` is its curvature basis (``hybrid4_basis``).
     """
     name: str
     eps: tuple
     shapes: tuple
+    mix: tuple | None = None
 
     def __post_init__(self):
         # normalised once, here: lists or numpy scalars from a caller become
@@ -158,20 +171,34 @@ class HybridLaw:
         object.__setattr__(self, "eps", tuple(float(e) for e in self.eps))
         object.__setattr__(self, "shapes", tuple(
             tuple(float(c) for c in a) for a in self.shapes))
+        if self.mix is not None:
+            m = np.asarray(self.mix, dtype=np.float64)
+            if m.shape != (self.n_w, self.n_w):
+                raise ValueError(f"{self.name}: mix must be {self.n_w} x "
+                                 f"{self.n_w} (one row per shape); got "
+                                 f"{m.shape}")
+            if abs(np.linalg.det(m)) < 1e-12:
+                raise ValueError(f"{self.name}: mix must be invertible")
+            # the identity is no mixing: the same definition as none
+            mix = None if np.array_equal(m, np.eye(self.n_w)) else tuple(
+                tuple(float(c) for c in row) for row in m)
+            object.__setattr__(self, "mix", mix)
 
     @property
     def definition(self) -> tuple:
-        """What the law computes -- its poles and shapes, not its name. The
-        kernel caches key on this: two laws alike in name but not here never
-        share a kernel, and two alike here share one whatever their names."""
-        return (self.eps, self.shapes)
+        """What the law computes -- its poles, shapes and mixing, not its
+        name. The kernel caches key on this: two laws alike in name but not
+        here never share a kernel, and two alike here share one whatever
+        their names."""
+        return (self.eps, self.shapes, self.mix)
 
     @property
     def is_hybrid2_type(self) -> bool:
         """hybrid2's structure -- shapes {1 - mu^2} and one pole -- whose
         physical region is an exact triangle (ld.hybrid2_from_q) rather than
         the simplex of the other laws."""
-        return len(self.eps) == 1 and self.shapes == ((1.0, -1.0, 0.0),)
+        return (len(self.eps) == 1 and self.shapes == ((1.0, -1.0, 0.0),)
+                and self.mix is None)
 
     @property
     def n_w(self) -> int:
@@ -187,7 +214,7 @@ class HybridLaw:
         return any(a[2] != 0.0 for a in self.shapes)
 
     def generator_matrix(self) -> np.ndarray:
-        """S (n_w, 3 + K): each shape term T_j as a combination of the
+        """S (n_w, 3 + K): each of the law's shapes as a combination of the
         generator columns [mu^0, mu^2, mu^4, P_eps_0, ...]."""
         K = len(self.eps)
         S = np.zeros((self.n_w, 3 + K))
@@ -199,6 +226,8 @@ class HybridLaw:
             j = len(self.shapes) + k
             S[j, 0] = -(p ** -2) / N_eps          # Pi_eps = (P_eps - p^-2) / N_eps
             S[j, 3 + k] = 1.0 / N_eps
+        if self.mix is not None:
+            S = np.asarray(self.mix) @ S
         return S
 
     def generator_norms(self) -> np.ndarray:
@@ -214,9 +243,42 @@ class HybridLaw:
                                @ self.generator_norms()])
 
 
+def hybrid4_basis(eps) -> np.ndarray:
+    """hybrid4's curvature basis for poles ``eps`` = (eps0, eps1): rows are
+    the shapes S1..S4 as combinations of T = (1 - mu^4, (1 - mu^2)^2,
+    Pi_eps0, Pi_eps1). With x = mu^2 and g = dI/dx, the weight simplex
+    w >= 0, sum w <= 1 in this basis is exactly the set of profiles in the
+    law's span with I >= 0, g >= 0, g' <= 0 and g'' >= 0 on [0, 1]:
+
+        S1 = 1 - mu^2            (I = mu^2)
+        S2 = (1 - mu^2)^2        (I = 1 - (1 - mu^2)^2)
+        S3: I(0) = 0, g(1) = g'(1) = g''(1) = 0
+        S4: I(0) = 0, g(1) = g'(1) = 0, g''(0) = 0
+    """
+    e0, e1 = (float(e) for e in eps)
+    a0, a1 = (1.0 / (e ** -2 - (1.0 + e) ** -2) for e in (e0, e1))
+
+    def g(x):
+        return [2 * x, 2 * (1 - x), 2 * a0 * (x + e0) ** -3, 2 * a1 * (x + e1) ** -3]
+
+    def g1(x):
+        return [2.0, -2.0, -6 * a0 * (x + e0) ** -4, -6 * a1 * (x + e1) ** -4]
+
+    def g2(x):
+        return [0.0, 0.0, 24 * a0 * (x + e0) ** -5, 24 * a1 * (x + e1) ** -5]
+
+    rhs = [1.0, 0.0, 0.0, 0.0]
+    S3 = np.linalg.solve([[1.0] * 4, g(1.0), g1(1.0), g2(1.0)], rhs)
+    S4 = np.linalg.solve([[1.0] * 4, g(1.0), g1(1.0), g2(0.0)], rhs)
+    return np.array([[0.5, 0.5, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], S3, S4])
+
+
 HYBRID2 = HybridLaw("hybrid2", (HYBRID2_EPS,), ((1.0, -1.0, 0.0),))
 HYBRID4_EPS = ladder(2, HYBRID4_ALPHA)      # 0.028601, 0.385824
-HYBRID4 = HybridLaw("hybrid4", HYBRID4_EPS, ((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)))
+#: hybrid4's curvature basis (``hybrid4_basis``): its weights refer to S1..S4
+HYBRID4_BASIS = hybrid4_basis(HYBRID4_EPS)
+HYBRID4 = HybridLaw("hybrid4", HYBRID4_EPS, ((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)),
+                    mix=HYBRID4_BASIS)
 HYBRID5 = HybridLaw("hybrid5", ladder(3), ((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)))
 #: THE registry of hybrid laws: every entry point accepts these names, read
 #: at call time. A HybridLaw object works anywhere a name does; the kernels

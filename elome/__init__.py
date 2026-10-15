@@ -27,12 +27,14 @@ from .kepler import (kepler, kepler_E, kepler_E_sincos,
                      separation_keplerian)
 from .anchored import anchor_constants, separation_anchored
 from .poly import flux_dev_poly, sn_dev_poly
-from .hybrid import (HYBRID2, HYBRID2_EPS, HYBRID4, HYBRID4_EPS,
-                     HYBRID5, HybridLaw, LAWS as HYBRID_LAWS,
+from .hybrid import (HYBRID2, HYBRID2_EPS, HYBRID4, HYBRID4_BASIS,
+                     HYBRID4_EPS, HYBRID5, HybridLaw, LAWS as HYBRID_LAWS,
+                     hybrid4_basis,
                      flux_dev_hybrid, hybrid_norms, shape_cols)
 from .oblate import flux_dev_oblate, shape_cols_oblate
 from .oblate_tau import contact_offsets_oblate
 from .ld import (hybrid2_from_q, hybrid2_from_q_np, hybrid2_to_q_np,
+                 hybrid4_from_q, hybrid4_from_q_np, hybrid4_to_q_np,
                  q_from_simplex_np, q_to_u, q_to_u_np, simplex_from_q,
                  simplex_from_q_np, u_to_q_np)
 from .metal import flux_dev_from_tau, flux_dev_metal, metal_available
@@ -68,6 +70,8 @@ __all__ = [
     "HYBRID2",
     "HYBRID2_EPS",
     "HYBRID4_EPS",
+    "HYBRID4_BASIS",
+    "hybrid4_basis",
     "flux_dev_oblate",
     "shape_cols_oblate",
     "contact_offsets_oblate",
@@ -80,6 +84,9 @@ __all__ = [
     "hybrid2_from_q",
     "hybrid2_from_q_np",
     "hybrid2_to_q_np",
+    "hybrid4_from_q",
+    "hybrid4_from_q_np",
+    "hybrid4_to_q_np",
     "simplex_from_q",
     "simplex_from_q_np",
     "q_from_simplex_np",
@@ -87,4 +94,4 @@ __all__ = [
     "sn_dev_with_aux",
 ]
 
-__version__ = "0.16.4"
+__version__ = "0.17.0"

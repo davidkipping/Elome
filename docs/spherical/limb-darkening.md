@@ -56,8 +56,13 @@ $$
 \frac{I(0)}{I(1)} = 1 - \sum_j w_j .
 $$
 
-A physical profile (non-negative intensity, darker towards the limb) has
-$w_j \ge 0$ and $\sum_j w_j \le 1$ for `hybrid4` and `hybrid5`. For
+For `hybrid4` the terms are its *curvature basis*: $T_1 = 1 - \mu^2$,
+$T_2 = (1 - \mu^2)^2$, and two pole-dominated shapes. In that basis the
+simplex $w_j \ge 0$, $\sum_j w_j \le 1$ is *exactly* the set of `hybrid4`
+profiles that are non-negative, darker towards the limb, concave in
+$\mu^2$ and of convex slope in $\mu^2$: every point of it is such a
+profile, and every such profile is in it. For `hybrid5` the same simplex
+guarantees a non-negative profile that darkens towards the limb. For
 `hybrid2` the physical region is a triangle.
 
 ## Priors on the coefficients
@@ -70,7 +75,15 @@ is easy, onto its physical region, uniformly:
 |---|---|---|
 | quadratic | `q_to_u(q1, q2)` (Kipping 2013) | `u_to_q_np` |
 | hybrid2 | `hybrid2_from_q(q1, q2)`, the exact triangle | `hybrid2_to_q_np` |
-| hybrid4, hybrid5 | `simplex_from_q(q)`, stick-breaking onto the simplex | `q_from_simplex_np` |
+| hybrid4 | `hybrid4_from_q(q)`, the exact curvature simplex | `hybrid4_to_q_np` |
+| hybrid5 | `simplex_from_q(q)`, stick-breaking onto the simplex | `q_from_simplex_np` |
+
+For `hybrid4`, $q_1$–$q_4$ are the direct analogue of Kipping's $q_1$,
+$q_2$: $q_1 = (1 - I(0))^4$ sets the centre-to-limb drop, and the others
+divide it among the four shapes. Do not use `simplex_from_q` for
+`hybrid4`: it covers the same simplex but gives different weights for
+the same $q$, so its $q$ would not match published `hybrid4`
+coefficients.
 
 Each map has an MLX version, which is differentiable and suited to
 sampling, and a numpy version with the `_np` suffix:

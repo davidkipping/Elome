@@ -117,6 +117,11 @@ def kernel32(z, r, law):
 TOL64 = {1.2: 1e-14, 3.0: 1e-14, 7.28: 1e-13, 20.0: 1e-12, 50.0: 1e-11}
 TOL64_POLY = {1.2: 1e-14, 3.0: 1e-13, 7.28: 1e-12, 20.0: 1e-10,
               50.0: 1e-8}
+# hybrid weights with mu^4 content: the even recursion's mu^4 column loses
+# digits with r as the polynomial law's does (measured 1.4e-8 at r = 50 for
+# a mu^4 coefficient of 0.2, in any basis); hybrid5's test weights carry
+# none (their 1 - mu^4 and (1 - mu^2)^2 terms cancel it)
+TOL64_MU4 = {1.2: 1e-14, 3.0: 3e-14, 7.28: 2e-12, 20.0: 3e-10, 50.0: 5e-8}
 # fp32 kernels: the partial-overlap error grows ~ r^2 (terms of size ~r
 # cancel to O(1)); about 2x the measured worst case
 TOL32 = {1.2: 5e-7, 3.0: 1e-6, 7.28: 2e-5, 20.0: 3e-4, 50.0: 5e-3}
@@ -129,7 +134,12 @@ def test_fp64_graph_matches_the_oracle(r, law):
     zs = zgrid(r)
     ref = np.array([oracle(z, r, law) for z in zs])
     got = graph64(zs, r, law)
-    tol = (TOL64_POLY if law == "poly4" else TOL64)[r]
+    if law == "poly4":
+        tol = TOL64_POLY[r]
+    elif law in LAWS and w_to_c(law, W[law])[0][2] != 0.0:
+        tol = TOL64_MU4[r]
+    else:
+        tol = TOL64[r]
     assert np.abs(got - ref).max() < tol
 
 

@@ -5,6 +5,33 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-10-15
+
+### Changed
+- **hybrid4's weights now refer to its curvature basis** (breaking for
+  hybrid4 weights and priors). The poles, the span of profiles and the
+  light curves a profile gives are unchanged; the four weights now
+  multiply shapes S1..S4 (`HYBRID4_BASIS`, rows over the previous terms
+  1 - mu^4, (1 - mu^2)^2, Pi_eps0, Pi_eps1), with S1 = 1 - mu^2 and
+  S2 = (1 - mu^2)^2. In this basis the simplex w >= 0, sum w <= 1 is
+  *exactly* the set of hybrid4 profiles that are positive, monotonic,
+  concave in mu^2 and of convex slope in mu^2, the basis the hybrid-law
+  coefficients paper tabulates. Weights from earlier versions convert
+  with `w = w_old @ inv(HYBRID4_BASIS)`; q values do not convert one to
+  one, so recompute them from w. The `ld_basis` columns for hybrid4 are
+  now [E0, S1..S4], and `hybrid_norms("hybrid4")` follows.
+
+### Added
+- `hybrid4_from_q` (MLX), `hybrid4_from_q_np`, `hybrid4_to_q_np`: the
+  uniform prior map from the unit cube onto hybrid4's curvature simplex,
+  the analogue of Kipping's q1, q2 (q1 = (1 - I(0))^4). Use it, not
+  `simplex_from_q`, for hybrid4: the stick-breaking map covers the same
+  simplex but gives other weights for the same q. `simplex_from_q`
+  remains hybrid5's.
+- `HybridLaw(..., mix=M)`: a law whose terms are combinations M T of the
+  default ones; `hybrid4_basis(eps)` gives the curvature basis for any
+  two poles.
+
 ## [0.16.4] — 2026-10-15
 
 ### Fixed

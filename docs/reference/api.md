@@ -628,6 +628,51 @@ hybrid2_to_q_np(w1, w2, eps=None, law=None)
 Inverse of hybrid2_from_q_np: solve w = s V_c + (s q2)(V_l - V_c).
 ```
 
+### `hybrid4_from_q`
+
+```python
+hybrid4_from_q(q: mx.array) -> mx.array
+```
+
+```text
+q (..., 4) in [0,1]^4 -> hybrid4 weights w (..., 4), uniform on its
+curvature simplex -- exactly the profiles in its span that are
+positive, monotonic, concave in mu^2 and of convex slope in mu^2, so
+every q is such a profile and every such profile has a q (the analogue
+of Kipping's q1, q2). The depth s = sum w = 1 - I(0) comes first,
+s = q1^(1/4), then stick-breaking over the four shapes:
+
+    w = s (1 - a,  a (1 - b),  a b (1 - q4),  a b q4),
+    a = q2^(1/3),  b = q3^(1/2).
+
+Not ``simplex_from_q``, which draws w1 first: both are uniform on the
+simplex but give different w for the same q. MLX ops; q clamped away
+from 0 for a finite gradient.
+```
+
+### `hybrid4_from_q_np`
+
+```python
+hybrid4_from_q_np(q)
+```
+
+```text
+Float64 host-side replica of hybrid4_from_q.
+```
+
+### `hybrid4_to_q_np`
+
+```python
+hybrid4_to_q_np(w)
+```
+
+```text
+Inverse of hybrid4_from_q_np (host-side, for initial states):
+q1 = s^4, q2 = (1 - w1/s)^3, q3 = (1 - w2/(s - w1))^2,
+q4 = w4/(w3 + w4), s = sum w. A coordinate left undetermined (s = 0,
+s = w1 or w3 + w4 = 0: every value maps to the same w) is 0.5.
+```
+
 ### `simplex_from_q`
 
 ```python
@@ -636,7 +681,8 @@ simplex_from_q(q: mx.array) -> mx.array
 
 ```text
 q (..., n) in [0,1]^n -> w (..., n) uniform on the simplex
-{w_j >= 0, sum w_j <= 1} (hybrid4/5's physical region), by stick-
+{w_j >= 0, sum w_j <= 1} (hybrid5's physical region; hybrid4's prior
+is ``hybrid4_from_q``), by stick-
 breaking a flat Dirichlet: w_j = (1 - q_j^(1/(n-j))) prod_{i<j}
 q_i^(1/(n-i)). MLX ops; q clamped away from 0 for a finite gradient.
 ```
@@ -668,35 +714,40 @@ and 0.5 is returned for them.
 ### `HybridLaw`
 
 ```python
-HybridLaw(name: str, eps: tuple, shapes: tuple) -> None
+HybridLaw(name: str, eps: tuple, shapes: tuple, mix: tuple | None = None) -> None
 ```
 
 ```text
-A named law: its poles and its even shape terms.
+A named law: its poles and its shape terms.
 
 ``shapes`` holds the even shape terms as (a0, a1, a2) coefficients over
 the monomial columns (mu^0, mu^2, mu^4): (1, -1, 0) is 1 - mu^2,
 (1, 0, -1) is 1 - mu^4, (1, -2, 1) is (1 - mu^2)^2. The pole shapes
-Pi_eps follow, one per entry of ``eps``, in that order. Weights are
-ordered (even shapes..., pole shapes...), as in the notes.
+Pi_eps follow, one per entry of ``eps``, in that order: together they
+are the terms T = (even shapes..., pole shapes...).
+
+``mix`` (optional, n_w x n_w, invertible) makes the law's shapes the
+combinations S_k = sum_j mix[k][j] T_j, and its weights refer to those:
+I/I(1) = 1 - sum_k w_k S_k. Without it the shapes are T themselves.
+hybrid4's ``mix`` is its curvature basis (``hybrid4_basis``).
 ```
 
 ### `HYBRID2`
 
 ```python
-HYBRID2 = HybridLaw(name='hybrid2', eps=(0.36,), shapes=((1.0, -1.0, 0.0),))
+HYBRID2 = HybridLaw(name='hybrid2', eps=(0.36,), shapes=((1.0, -1.0, 0.0),), mix=None)
 ```
 
 ### `HYBRID4`
 
 ```python
-HYBRID4 = HybridLaw(name='hybrid4', eps=(0.028601207249486824, 0.38582417584735224), shapes=((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)))
+HYBRID4 = HybridLaw(name='hybrid4', eps=(0.028601207249486824, 0.38582417584735224), shapes=((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)), mix=((0.5, 0.5, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0), (0.0006260842489149928, 0.0014040137554114226, 1.020963273947444, -0.022993371951770075), (-0.08116019831892918, -0.2568535772254558, -0.0005906631447752816, 1.3386044386891605)))
 ```
 
 ### `HYBRID5`
 
 ```python
-HYBRID5 = HybridLaw(name='hybrid5', eps=(0.0015965451792942786, 0.04127504477274302, 0.38743471584956696), shapes=((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)))
+HYBRID5 = HybridLaw(name='hybrid5', eps=(0.0015965451792942786, 0.04127504477274302, 0.38743471584956696), shapes=((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)), mix=None)
 ```
 
 ### `HYBRID2_EPS`
@@ -711,10 +762,23 @@ HYBRID2_EPS = 0.36
 HYBRID4_EPS = (0.028601207249486824, 0.38582417584735224)
 ```
 
+### `HYBRID4_BASIS`
+
+```python
+HYBRID4_BASIS = array([[ 5.00000000e-01,  5.00000000e-01,  0.00000000e+00,
+         0.00000000e+00],
+       [ 0.00000000e+00,  1.00000000e+00,  0.00000000e+00,
+         0.00000000e+00],
+       [ 6.26084249e-04,  1.40401376e-03,  1.02096327e+00,
+        -2.29933720e-02],
+       [-8.11601983e-02, -2.56853577e-01, -5.90663145e-04,
+         1.33860444e+00]])
+```
+
 ### `HYBRID_LAWS`
 
 ```python
-HYBRID_LAWS = {'hybrid2': HybridLaw(name='hybrid2', eps=(0.36,), shapes=((1.0, -1.0, 0.0),)), 'hybrid4': HybridLaw(name='hybrid4', eps=(0.028601207249486824, 0.38582417584735224), shapes=((1.0, 0.0, -1.0), (1.0, -2.0, 1.0))), 'hybrid5': HybridLaw(name='hybrid5', eps=(0.0015965451792942786, 0.04127504477274302, 0.38743471584956696), shapes=((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)))}
+HYBRID_LAWS = {'hybrid2': HybridLaw(name='hybrid2', eps=(0.36,), shapes=((1.0, -1.0, 0.0),), mix=None), 'hybrid4': HybridLaw(name='hybrid4', eps=(0.028601207249486824, 0.38582417584735224), shapes=((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)), mix=((0.5, 0.5, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0), (0.0006260842489149928, 0.0014040137554114226, 1.020963273947444, -0.022993371951770075), (-0.08116019831892918, -0.2568535772254558, -0.0005906631447752816, 1.3386044386891605))), 'hybrid5': HybridLaw(name='hybrid5', eps=(0.0015965451792942786, 0.04127504477274302, 0.38743471584956696), shapes=((1.0, 0.0, -1.0), (1.0, -2.0, 1.0)), mix=None)}
 ```
 
 ### `hybrid_norms`
@@ -726,6 +790,25 @@ hybrid_norms(law) -> np.ndarray
 ```text
 N = [pi, N_1..N_n] for the ``ld_basis`` contract
 flux - 1 == (B @ c) / (N @ c), c = (1, -w). Float64, host-side.
+```
+
+### `hybrid4_basis`
+
+```python
+hybrid4_basis(eps) -> np.ndarray
+```
+
+```text
+hybrid4's curvature basis for poles ``eps`` = (eps0, eps1): rows are
+the shapes S1..S4 as combinations of T = (1 - mu^4, (1 - mu^2)^2,
+Pi_eps0, Pi_eps1). With x = mu^2 and g = dI/dx, the weight simplex
+w >= 0, sum w <= 1 in this basis is exactly the set of profiles in the
+law's span with I >= 0, g >= 0, g' <= 0 and g'' >= 0 on [0, 1]:
+
+    S1 = 1 - mu^2            (I = mu^2)
+    S2 = (1 - mu^2)^2        (I = 1 - (1 - mu^2)^2)
+    S3: I(0) = 0, g(1) = g'(1) = g''(1) = 0
+    S4: I(0) = 0, g(1) = g'(1) = 0, g''(0) = 0
 ```
 
 ### `hybrid.ladder`

@@ -1,7 +1,8 @@
 """Physical weight vectors for any hybrid law -- one helper for every
 hybrid test file. The region follows the law's structure
 (HybridLaw.is_hybrid2_type, the rule the priors use): an exact triangle,
-reaching negative weights, for a hybrid2-type law; the simplex otherwise."""
+reaching negative weights, for a hybrid2-type law; the simplex otherwise
+(hybrid4's curvature simplex sampled by its own map)."""
 
 import numpy as np
 
@@ -16,6 +17,8 @@ def phys_w(law, rng, n=None):
     if L.is_hybrid2_type:
         w = ld.hybrid2_from_q_np(rng.random(n), rng.random(n), law=L)
         return np.stack(w, axis=-1)
+    if L.definition == get_law("hybrid4").definition:
+        return ld.hybrid4_from_q_np(rng.random((4,) if n is None else (n, 4)))
     return ld.simplex_from_q_np(rng.random((L.n_w,) if n is None
                                            else (n, L.n_w)))
 

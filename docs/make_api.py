@@ -39,10 +39,12 @@ SECTIONS = [
      "{doc}`../spherical/limb-darkening` and {doc}`hybrid-laws`.",
      ["elome.q_to_u", "elome.q_to_u_np", "elome.u_to_q_np",
       "elome.hybrid2_from_q", "elome.hybrid2_from_q_np", "elome.hybrid2_to_q_np",
+      "elome.hybrid4_from_q", "elome.hybrid4_from_q_np", "elome.hybrid4_to_q_np",
       "elome.simplex_from_q", "elome.simplex_from_q_np", "elome.q_from_simplex_np",
       "elome.HybridLaw", "elome.HYBRID2", "elome.HYBRID4", "elome.HYBRID5",
-      "elome.HYBRID2_EPS", "elome.HYBRID4_EPS", "elome.HYBRID_LAWS",
-      "elome.hybrid_norms", "elome.hybrid.ladder"]),
+      "elome.HYBRID2_EPS", "elome.HYBRID4_EPS", "elome.HYBRID4_BASIS",
+      "elome.HYBRID_LAWS", "elome.hybrid_norms", "elome.hybrid4_basis",
+      "elome.hybrid.ladder"]),
     ("Light curves from separations (float64 reference graphs)",
      "Functions of the sky separation z (spherical) or the planet's centre "
      "in its principal frame (oblate). They follow MLX's broadcasting and "

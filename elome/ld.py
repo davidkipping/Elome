@@ -21,7 +21,8 @@ import numpy as np
 
 __all__ = ["q_to_u", "q_to_u_np", "u_to_q_np",
            "hybrid2_vertices", "hybrid2_from_q", "hybrid2_from_q_np",
-           "hybrid2_to_q_np", "simplex_from_q", "simplex_from_q_np",
+           "hybrid2_to_q_np", "hybrid4_from_q", "hybrid4_from_q_np",
+           "hybrid4_to_q_np", "simplex_from_q", "simplex_from_q_np",
            "q_from_simplex_np"]
 
 
@@ -75,7 +76,8 @@ def _hybrid2_pole(eps=None, law=None) -> float:
         if not L.is_hybrid2_type:
             raise ValueError(f"{L.name} is not a hybrid2-type law (shapes "
                              "{1 - mu^2, Pi_eps}); its prior is "
-                             "simplex_from_q")
+                             "hybrid4_from_q for hybrid4, simplex_from_q "
+                             "otherwise")
         return float(L.eps[0])
     return HYBRID2_EPS if eps is None else float(eps)
 
@@ -136,9 +138,61 @@ def hybrid2_to_q_np(w1, w2, eps=None, law=None):
     return s * s, q2[()]
 
 
+def hybrid4_from_q(q: mx.array) -> mx.array:
+    """q (..., 4) in [0,1]^4 -> hybrid4 weights w (..., 4), uniform on its
+    curvature simplex -- exactly the profiles in its span that are
+    positive, monotonic, concave in mu^2 and of convex slope in mu^2, so
+    every q is such a profile and every such profile has a q (the analogue
+    of Kipping's q1, q2). The depth s = sum w = 1 - I(0) comes first,
+    s = q1^(1/4), then stick-breaking over the four shapes:
+
+        w = s (1 - a,  a (1 - b),  a b (1 - q4),  a b q4),
+        a = q2^(1/3),  b = q3^(1/2).
+
+    Not ``simplex_from_q``, which draws w1 first: both are uniform on the
+    simplex but give different w for the same q. MLX ops; q clamped away
+    from 0 for a finite gradient."""
+    q = mx.maximum(q, 1e-12)
+    s = mx.power(q[..., 0], 0.25)
+    a = mx.power(q[..., 1], 1.0 / 3.0)
+    b = mx.sqrt(q[..., 2])
+    q4 = q[..., 3]
+    return mx.stack([s * (1.0 - a), s * a * (1.0 - b),
+                     s * a * b * (1.0 - q4), s * a * b * q4], axis=-1)
+
+
+def hybrid4_from_q_np(q):
+    """Float64 host-side replica of hybrid4_from_q."""
+    q = np.maximum(np.asarray(q, dtype=np.float64), 1e-12)
+    s = q[..., 0] ** 0.25
+    a, b, q4 = q[..., 1] ** (1.0 / 3.0), np.sqrt(q[..., 2]), q[..., 3]
+    return np.stack([s * (1.0 - a), s * a * (1.0 - b),
+                     s * a * b * (1.0 - q4), s * a * b * q4], axis=-1)
+
+
+def hybrid4_to_q_np(w):
+    """Inverse of hybrid4_from_q_np (host-side, for initial states):
+    q1 = s^4, q2 = (1 - w1/s)^3, q3 = (1 - w2/(s - w1))^2,
+    q4 = w4/(w3 + w4), s = sum w. A coordinate left undetermined (s = 0,
+    s = w1 or w3 + w4 = 0: every value maps to the same w) is 0.5."""
+    w = np.asarray(w, dtype=np.float64)
+    s = w.sum(-1)
+    w1, w2, w3, w4 = (w[..., j] for j in range(4))
+    half = lambda x: np.full(np.shape(x), 0.5)
+    q2 = (1.0 - np.divide(w1, s, out=half(s), where=s != 0.0)) ** 3
+    q2 = np.where(s != 0.0, q2, 0.5)
+    rest = s - w1
+    q3 = (1.0 - np.divide(w2, rest, out=half(rest), where=rest != 0.0)) ** 2
+    q3 = np.where(rest != 0.0, q3, 0.5)
+    pole = w3 + w4
+    q4 = np.divide(w4, pole, out=half(pole), where=pole != 0.0)
+    return np.stack([s ** 4, q2, q3, q4], axis=-1)
+
+
 def simplex_from_q(q: mx.array) -> mx.array:
     """q (..., n) in [0,1]^n -> w (..., n) uniform on the simplex
-    {w_j >= 0, sum w_j <= 1} (hybrid4/5's physical region), by stick-
+    {w_j >= 0, sum w_j <= 1} (hybrid5's physical region; hybrid4's prior
+    is ``hybrid4_from_q``), by stick-
     breaking a flat Dirichlet: w_j = (1 - q_j^(1/(n-j))) prod_{i<j}
     q_i^(1/(n-i)). MLX ops; q clamped away from 0 for a finite gradient."""
     n = q.shape[-1]
