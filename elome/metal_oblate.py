@@ -12,10 +12,14 @@ Per point the work splits in two, exactly as the reference graph's
 stop-gradients split it:
 
 * **the detached solve** (plain float, ``ob_solve``): the regime, the limb
-  crossings and arcs, each level's four quartic roots -- seeded by the same
-  balanced, Wilkinson-shifted complex QR on the companion matrix as
-  ``oblate._qr_seeds`` (Metal has no eigensolver), then Aberth and Newton --
-  and the near-double pair selection;
+  crossings and arcs, each level's four quartic roots, and the near-double
+  pair selection. The roots are seeded by Ferrari's closed form, then
+  polished (Aberth, Newton) and checked, wherever the quartic is well
+  conditioned for it (|S2| >= 3e-3 |S1|: all but nearly circular planets).
+  Otherwise, and for any quartic that fails the check, the seeds come from
+  the same balanced, Wilkinson-shifted complex QR on the companion matrix
+  as ``oblate._qr_seeds`` (Metal has no eigensolver), the point's other
+  levels warm-started from the first;
 * **the live evaluation** (``ob_eval<T>``): coefficients, Fourier sums,
   one live Newton step per root, residues, continued logarithms, the pair
   formula with its Bairstow step, and the corner term.
@@ -269,8 +273,13 @@ inline void ob_qr_seeds(float S0, float2 S1, float S2, float p,
 }
 
 // Aberth (at most OB_ABERTH iterations, stopping once every correction is
-// at rounding) then two Newton polishes (oblate._aberth)
-inline void ob_aberth(float S0, float2 S1, float S2, float p, thread float2 *z) {
+// at rounding) then ``newton`` Newton polishes (oblate._aberth: two). The
+// live evaluation takes one Newton step from these frozen roots and
+// differentiates it, which is the implicit derivative only at convergence:
+// rough (Ferrari) seeds take OB_NEWTON polishes, for gradients as accurate
+// as from QR or warm-started seeds.
+inline void ob_aberth(float S0, float2 S1, float S2, float p, thread float2 *z,
+                      int newton) {
     for (int it = 0; it < OB_ABERTH; ++it) {
         float2 rr[4];
         for (int i = 0; i < 4; ++i)
@@ -288,7 +297,7 @@ inline void ob_aberth(float S0, float2 S1, float S2, float p, thread float2 *z) 
         for (int i = 0; i < 4; ++i) z[i] = nz[i];
         if (done) break;
     }
-    for (int it = 0; it < 2; ++it)
+    for (int it = 0; it < newton; ++it)
         for (int i = 0; i < 4; ++i)
             z[i] = z[i] - cdiv(ob_D(z[i], S0, S1, S2, p),
                                ob_dD(z[i], S0, S1, S2, p));
@@ -312,21 +321,99 @@ inline bool ob_good(thread const float2 *z, float S0, float2 S1, float S2,
     return (cab(sum * S2 + S1) <= OB_VTOL * (asum * fabs(S2) + cab(S1)))
            && (cab(prod - float2(1.0f, 0.0f)) <= OB_VTOL * 10.0f);
 }
-inline void ob_roots(float S0, float2 S1, float S2, float p, thread float2 *z) {
+// principal cube root
+inline float2 ob_ccbrt(float2 a) {
+    return cexpi(carg(a) * (1.0f / 3.0f)) * metal::precise::pow(cab(a), 1.0f / 3.0f);
+}
+// Seeds by Ferrari's closed form for D = S2 z^4 + S1 z^3 + (S0 - p) z^2
+// + S1* z + S2 (monic: the constant term is 1). Depressed, z = y - b/4:
+// y^4 + P y^2 + q y + r = (y^2 + P/2 + m)^2 - (s y - q / (2 s))^2 with
+// s = sqrt(2 m) and m any root of the resolvent cubic
+// m^3 + P m^2 + (P^2/4 - r) m - q^2/8, by Cardano. Two choices keep it
+// well conditioned in float32: the larger-magnitude Cardano branch (no
+// cancellation in -Q/2 +- disc) and the largest |m| of the three (keeps s
+// away from 0). In float32 these are seeds, not roots -- the polish and
+// the check in ob_roots make them roots -- and a double root's coincident
+// seeds are nudged apart, which Aberth needs.
+inline void ob_ferrari(float S0, float2 S1, float S2, float p, thread float2 *z) {
+    float inv = 1.0f / S2;
+    float2 b = S1 * inv, c = float2((S0 - p) * inv, 0.0f), d = cj(S1) * inv;
+    float2 b2 = cm(b, b), b3 = cm(b2, b), b4 = cm(b2, b2);
+    float2 P = c - b2 * (3.0f / 8.0f);
+    float2 q = d - cm(b, c) * 0.5f + b3 * 0.125f;
+    float2 r = float2(1.0f, 0.0f) - cm(b, d) * 0.25f + cm(b2, c) * (1.0f / 16.0f)
+               - b4 * (3.0f / 256.0f);
+    float2 cc = cm(P, P) * 0.25f - r, dd = -cm(q, q) * 0.125f;
+    float2 P3 = cc - cm(P, P) * (1.0f / 3.0f);
+    float2 Q3 = cm(cm(P, P), P) * (2.0f / 27.0f) - cm(P, cc) * (1.0f / 3.0f) + dd;
+    float2 disc = csq(cm(Q3, Q3) * 0.25f + cm(cm(P3, P3), P3) * (1.0f / 27.0f));
+    float2 bp = -Q3 * 0.5f + disc, bm = -Q3 * 0.5f - disc;
+    float2 u = ob_ccbrt((ca2(bp) >= ca2(bm)) ? bp : bm);
+    const float2 w = float2(-0.5f, 0.86602540f);          // e^{2 pi i / 3}
+    float2 m = -P * (1.0f / 3.0f);
+    float mbest = -1.0f;
+    for (int k = 0; k < 3; ++k) {
+        float2 uk = (k == 0) ? u : ((k == 1) ? cm(u, w) : cm(u, cj(w)));
+        float2 mk = ((ca2(uk) > 0.0f) ? uk - cdiv(P3, uk * 3.0f) : float2(0.0f))
+                    - P * (1.0f / 3.0f);
+        if (ca2(mk) > mbest) { mbest = ca2(mk); m = mk; }
+    }
+    float2 sq = csq(m * 2.0f);
+    float2 qs = (ca2(sq) > 0.0f) ? cdiv(q * 2.0f, sq) : float2(0.0f);
+    float2 t = -P * 2.0f - m * 2.0f;
+    float2 sp = csq(t - qs), sm = csq(t + qs);
+    float2 off = b * 0.25f;
+    z[0] = (sq + sp) * 0.5f - off;
+    z[1] = (sq - sp) * 0.5f - off;
+    z[2] = (sm - sq) * 0.5f - off;
+    z[3] = -(sq + sm) * 0.5f - off;
+    for (int i = 0; i < 4; ++i)
+        for (int j = i + 1; j < 4; ++j)
+            if (ca2(z[i] - z[j]) <= 1e-10f * (1.0f + ca2(z[i])))
+                z[j] += float2(1e-3f, 1e-3f) * (1.0f + cab(z[i]));
+}
+// One quartic's four roots, two ways. ob_solve picks one per point, from
+// its geometry (the ratio |S2| / |S1| is the same for the limb crossings
+// and every pole level):
+//
+// * ob_roots_ferrari: Ferrari seeds, Aberth and OB_NEWTON Newton steps,
+//   the residual + Vieta check, and the QR reseeding only if that fails.
+//   Every quartic of the point is solved this way, independently -- the
+//   closed form is cheaper than the QR, and cheaper than polishing from a
+//   neighbouring level's roots, which often failed the check.
+// * ob_roots_qr / ob_roots_warm: the balanced QR (as oblate._qr_seeds) for
+//   the point's first quartic, the others warm-started from the level
+//   before, exactly as without Ferrari. Taken when |S2| < OB_FERRARI |S1|:
+//   a nearly circular planet (S2 ~ A^2 f / 2), where Ferrari's division by
+//   S2 makes its depressed coefficients cancel catastrophically in float32
+//   (measured: its polished roots match the QR's for |S2|/|S1| >= 1e-3
+//   and fail below 3e-4), while the balanced QR is indifferent to it.
+inline void ob_roots_qr(float S0, float2 S1, float S2, float p, thread float2 *z) {
     ob_qr_seeds(S0, S1, S2, p, z);
-    ob_aberth(S0, S1, S2, p, z);
+    ob_aberth(S0, S1, S2, p, z, 2);
 }
 // z holds a neighbouring level's roots (the quartics differ only in their
 // z^2 coefficient): Aberth from there, QR if that fails the check
 inline void ob_roots_warm(float S0, float2 S1, float S2, float p,
                           thread float2 *z) {
     float2 w[4] = {z[0], z[1], z[2], z[3]};
-    ob_aberth(S0, S1, S2, p, w);
+    ob_aberth(S0, S1, S2, p, w, 2);
     if (ob_good(w, S0, S1, S2, p)) {
         for (int i = 0; i < 4; ++i) z[i] = w[i];
     } else {
-        ob_roots(S0, S1, S2, p, z);
+        ob_roots_qr(S0, S1, S2, p, z);
     }
+}
+inline void ob_roots_ferrari(float S0, float2 S1, float S2, float p,
+                             thread float2 *z) {
+    ob_ferrari(S0, S1, S2, p, z);
+    ob_aberth(S0, S1, S2, p, z, OB_NEWTON);
+    if (ob_good(z, S0, S1, S2, p)) return;
+    ob_qr_seeds(S0, S1, S2, p, z);
+    ob_aberth(S0, S1, S2, p, z, OB_NEWTON);
+}
+inline bool ob_use_ferrari(float2 S1, float S2) {
+    return fabs(S2) >= OB_FERRARI * cab(S1);
 }
 
 // ---------------- crossings and arcs (oblate._crossings, _arcs) ----------
@@ -337,12 +424,13 @@ inline void ob_g_dg(float phi, float x0, float y0, float a, float b,
     *g = x * x + y * y - 1.0f;
     *dg = 2.0f * (-x * a * s + y * b * c);
 }
-inline int ob_crossings(float x0, float y0, float a, float b,
+inline int ob_crossings(float x0, float y0, float a, float b, bool fer,
                         thread float *pa, thread float *pb, thread float2 *z) {
     float S0 = x0 * x0 + y0 * y0 + 0.5f * (a * a + b * b);
     float2 S1 = float2(a * x0, -(b * y0));
     float S2 = 0.25f * (a * a - b * b);
-    ob_roots(S0, S1, S2, 1.0f, z);
+    if (fer) ob_roots_ferrari(S0, S1, S2, 1.0f, z);
+    else     ob_roots_qr(S0, S1, S2, 1.0f, z);
     float sc = 1.0f + (fabs(x0) + a) * (fabs(x0) + a)
                     + (fabs(y0) + b) * (fabs(y0) + b);
     float phis[4]; bool valid[4];
@@ -448,13 +536,17 @@ inline void ob_solve(float x0, float y0, float A, float B,
     fz.lo = 0.0f; fz.hi = 0.0f; fz.dth = 0.0f;
     float d = metal::precise::sqrt(x0 * x0 + y0 * y0);
     if (d - A >= 1.0f) return;
+    float S0 = x0 * x0 + y0 * y0 + 0.5f * (A * A + B * B);
+    float2 S1 = float2(A * x0, -(B * y0));
+    float S2 = 0.25f * (A * A - B * B);
+    bool fer = ob_use_ferrari(S1, S2);
     float2 zprev[4];
-    bool have = false;                 // zprev holds the level-1 roots
+    bool have = false;                 // zprev holds the crossing roots
     if (d + A < 1.0f) {
         fz.regime = 1;
     } else {
         float pa, pb;
-        int cnt = ob_crossings(x0, y0, A, B, &pa, &pb, zprev);
+        int cnt = ob_crossings(x0, y0, A, B, fer, &pa, &pb, zprev);
         have = true;
         if (cnt == 2) {
             fz.regime = 2;
@@ -465,18 +557,17 @@ inline void ob_solve(float x0, float y0, float A, float B,
             return;
         }
     }
-    float S0 = x0 * x0 + y0 * y0 + 0.5f * (A * A + B * B);
-    float2 S1 = float2(A * x0, -(B * y0));
-    float S2 = 0.25f * (A * A - B * B);
-    // one QR solve per point; every other level warm-starts from the last
     for (int k = 0; k < HYB_K; ++k) {
         thread float2 *zk = &fz.z[4 * k];
-        if (k == 0 && !have) {
-            ob_roots(S0, S1, S2, 1.0f + HYB_POLE[k], zk);
-        } else {
+        float pk = 1.0f + HYB_POLE[k];
+        if (fer) {
+            ob_roots_ferrari(S0, S1, S2, pk, zk);   // each level on its own
+        } else if (k == 0 && !have) {
+            ob_roots_qr(S0, S1, S2, pk, zk);
+        } else {                                    // from the level before
             thread const float2 *src = (k == 0) ? zprev : &fz.z[4 * (k - 1)];
             for (int i = 0; i < 4; ++i) zk[i] = src[i];
-            ob_roots_warm(S0, S1, S2, 1.0f + HYB_POLE[k], zk);
+            ob_roots_warm(S0, S1, S2, pk, zk);
         }
         if (fz.regime == 2)
             ob_pairs(&fz.z[4 * k], fz.lo, fz.hi, &fz.pj[2 * k], &fz.pl[2 * k],
@@ -849,7 +940,7 @@ _OB_CONST = {
     "OB_NSERIES": "18", "OB_ZTOL": "3e-3f", "OB_GTOL": "1e-5f",
     "OB_PAIRTOL": "1e-3f", "OB_PAIRRATIO": "0.1f", "OB_FSW": _f(_F_SW32),
     "OB_DEFL": "1.2e-7f", "OB_ATOL": "2.4e-7f", "OB_RTOL": "3e-5f",
-    "OB_VTOL": "1e-4f", "OB_PAIRPOLISH": "2",
+    "OB_VTOL": "1e-4f", "OB_PAIRPOLISH": "2", "OB_NEWTON": "6", "OB_FERRARI": "3e-3f",
 }
 
 
