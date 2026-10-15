@@ -516,10 +516,10 @@ print(f"flux_dev_from_tau on the GPU: spherical {k_s:.2f} ms ({k_s * 1e6 / npts:
 
 md("""
 The ratio depends on the law, the shapes and how much of the grid is in
-transit: 16-37x for 512 chains of 5,000 points around a transit, about
+transit: 15-32x for 512 chains of 5,000 points around a transit, about
 50x for the sets above. With the contact rule each point costs 25
 evaluations, and the spherical kernel is so cheap per evaluation that the
-oblate one is ~80x it there. In absolute terms an oblate planet
+oblate one is ~60x it there. In absolute terms an oblate planet
 on the GPU is still far faster than the CPU codes for oblate planets -- see
 [Accuracy and cost](../oblate/accuracy-and-cost.md) (squishyplanet, JoJo,
 GreenLantern).
@@ -601,7 +601,7 @@ md("""
 | float64 accuracy | ~1e-16 | ~1e-16 (vs a 30-digit integral) |
 | float32 (GPU) accuracy | ~1e-7 | ~1e-7 |
 | exposures, eccentric orbits, gradients, batching, `ld_basis` | yes | yes |
-| cost (fp32 GPU) | ~0.2 ns per point | tens of times that (16-37x; B8 measures this notebook's case); ~80x under the contact rule |
+| cost (fp32 GPU) | ~0.2 ns per point | tens of times that (15-32x; B8 measures this notebook's case); ~60x under the contact rule |
 
 ## Where to go next
 

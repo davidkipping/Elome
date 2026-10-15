@@ -78,9 +78,13 @@ boundary of the overlap, which consists of arcs of the ellipse and of
 the stellar limb. Along the ellipse, the even terms integrate to finite
 Fourier sums, and each pole term to a sum over the roots of a quartic,
 one quartic per pole and point. Where the ellipse crosses the limb is
-another quartic. The GPU kernel finds the roots with its own small
-eigenvalue solver (Metal has no linear algebra), polishes them, and
-checks them. The contact times for exposure integration are solved per
+another quartic. The GPU kernel seeds each quartic's roots from the
+closed-form (Ferrari) solution, polishes them with Aberth and Newton
+iterations, and checks them against the residual and Vieta's relations.
+For a nearly circular planet, where the closed form loses precision in
+float32 (its leading coefficient is proportional to the flattening),
+and for any quartic that fails the check, the seeds come instead from
+its own small eigenvalue solver (Metal has no linear algebra). The contact times for exposure integration are solved per
 side with a monotone Newton iteration on convex distance functions, and
 a separate kernel computes them.
 

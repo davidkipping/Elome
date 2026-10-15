@@ -2,7 +2,7 @@
 
 # Oblate planets: cross-code benchmark
 
-Machine: macOS-27.0.1-arm64-arm-64bit, Python 3.11.5; run 2026-10-10 20:58 (load average 4.1 at the start). See README.md here for the environment and the macOS build of GreenLantern.
+Machine: macOS-27.0.1-arm64-arm-64bit, Python 3.11.5; run 2026-10-15 07:10 (load average 2.1 at the start). See README.md here for the environment and the macOS build of GreenLantern.
 
 Scenario: the spherical benchmark's transit (P = 3.456 d, a/R* = 8.8, b = 0.45, area-equivalent Rp/R* = 0.1) with projected flattening f = 0.2 and the long axis at 30 deg to the motion. Limb darkening is the one profile every code expresses exactly: I(mu) = 1 - 0.5 (1 - mu^2), Elómë's hybrid2 with its pole weight 0, and the quadratic law (u1, u2) = (1.0, -0.5) for the others. Circular orbit, instantaneous fluxes. Every code's parameter mapping was checked against the others before timing.
 
@@ -36,24 +36,24 @@ The fp64 codes all reach rounding on these transits (JoJo's 100-step line integr
 
 | code | N = 1,000 | N = 10,000 | N = 100,000 | N = 1,000,000 | N = 10,000,000 |
 |---|---:|---:|---:|---:|---:|
-| Elómë fp64 (CPU) | 13.67 ms | 56.18 ms | 443.09 ms | 4,703.33 ms | 48.0 s |
-| Elómë fp32 (GPU, Metal) | 1.63 ms | 1.63 ms | 1.84 ms | 6.31 ms | 54.75 ms |
-| squishyplanet 0.5.0 (JAX, fp64, CPU) | 3.97 ms | 39.72 ms | 409.75 ms | 4,106.29 ms | 43.5 s |
-| JoJo 0.1.0 (numpy, fp64) | 0.66 ms | 5.16 ms | 47.08 ms | 577.87 ms | 7,023.36 ms |
-| GreenLantern 1.6 (OpenCL GPU, fp32) | 0.86 ms | 2.96 ms | 24.02 ms | 235.27 ms | 2,347.47 ms |
+| Elómë fp64 (CPU) | 13.35 ms | 55.68 ms | 467.71 ms | 4,705.86 ms | 47.1 s |
+| Elómë fp32 (GPU, Metal) | 0.45 ms | 0.48 ms | 0.81 ms | 3.61 ms | 35.26 ms |
+| squishyplanet 0.5.0 (JAX, fp64, CPU) | 3.88 ms | 37.67 ms | 374.30 ms | 3,807.63 ms | 41.1 s |
+| JoJo 0.1.0 (numpy, fp64) | 0.64 ms | 4.84 ms | 44.63 ms | 561.25 ms | 6,120.77 ms |
+| GreenLantern 1.6 (OpenCL GPU, fp32) | 0.81 ms | 2.87 ms | 24.02 ms | 235.00 ms | 2,346.28 ms |
 
-At N = 10^7 Elómë's fp32 kernel is 43x faster than GreenLantern 1.6 (OpenCL GPU, fp32), 128x faster than JoJo 0.1.0 (numpy, fp64), 795x faster than squishyplanet 0.5.0 (JAX, fp64, CPU), 877x faster than Elómë fp64 (CPU).
+At N = 10^7 Elómë's fp32 kernel is 67x faster than GreenLantern 1.6 (OpenCL GPU, fp32), 174x faster than JoJo 0.1.0 (numpy, fp64), 1,166x faster than squishyplanet 0.5.0 (JAX, fp64, CPU), 1,337x faster than Elómë fp64 (CPU).
 
-Below ~10^4 points the GPU dispatch floor (~1.6 ms, including the per-call contact solve) dominates Elómë's fp32 route and the CPU codes are faster, as for spherical planets.
+Elómë's fp32 kernel is the fastest code at every N measured; at the smallest, its 0.45 ms is mostly the GPU dispatch floor.
 
 ## Many parameter sets: 512 sets x 10,000 points
 
 | code | wall | curves/s | how |
 |---|---:|---:|---|
-| Elómë fp32 (GPU, Metal) | 0.032 s | 16,055 | TransitModel.light_curves, one launch |
+| Elómë fp32 (GPU, Metal) | 0.020 s | 25,583 | TransitModel.light_curves, one launch |
 | GreenLantern 1.6 (OpenCL GPU, fp32) | 1.206 s | 425 | one launch, a parameter row per set |
-| JoJo 0.1.0 (numpy, fp64) | 2.740 s | 187 | Python loop (no batch API) |
-| squishyplanet 0.5.0 (JAX, fp64, CPU) | 30.938 s | 17 | jax.jit(jax.vmap(lightcurve)) |
+| JoJo 0.1.0 (numpy, fp64) | 2.546 s | 201 | Python loop (no batch API) |
+| squishyplanet 0.5.0 (JAX, fp64, CPU) | 29.016 s | 18 | jax.jit(jax.vmap(lightcurve)) |
 
 ## Value + gradient of a scalar loss (single light curve)
 
@@ -61,8 +61,8 @@ In every parameter each code exposes: for Elómë rp, f, theta, inc, t0, period,
 
 | code | N = 10,000 | N = 100,000 |
 |---|---:|---:|
-| Elómë fp64 (CPU) | 186.45 ms | 1,082.62 ms |
-| Elómë fp32 (GPU, Metal) | 2.69 ms | 4.28 ms |
-| squishyplanet 0.5.0 (JAX, fp64, CPU) | 240.94 ms | 2,468.80 ms |
-| GreenLantern 1.6 (OpenCL GPU, fp32) | 6.22 ms | 54.21 ms |
+| Elómë fp64 (CPU) | 184.23 ms | 1,082.04 ms |
+| Elómë fp32 (GPU, Metal) | 1.34 ms | 2.76 ms |
+| squishyplanet 0.5.0 (JAX, fp64, CPU) | 230.32 ms | 2,471.38 ms |
+| GreenLantern 1.6 (OpenCL GPU, fp32) | 6.40 ms | 54.34 ms |
 

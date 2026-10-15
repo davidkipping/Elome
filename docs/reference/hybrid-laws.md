@@ -119,5 +119,6 @@ quadratic law, whose $\mu^1$ term does. The closed forms are checked
 against a 40-digit direct integral to $10^{-13}$.
 
 For an oblate planet the boundary of the overlap is an elliptical arc,
-and each pole term needs the roots of a quartic per point. Elómë solves
-them with its own small eigenvalue solver on the GPU.
+and each pole term needs the roots of a quartic per point. Elómë's GPU
+kernel seeds them from the quartic's closed-form solution and polishes
+them (see {doc}`how-it-works`).

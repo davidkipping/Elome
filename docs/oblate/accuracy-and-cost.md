@@ -35,19 +35,22 @@ are `tau`, `period`, `a`, `b`, `r`, `f`, `theta`, every weight, and
 
 A spherical planet's light curve is a closed form at each point. An
 oblate planet's also needs the roots of a quartic per point and per
-limb-darkening pole, which the GPU kernel finds with its own small
-eigenvalue solver. Fused float32 kernels, 512 chains × 5,000 points
-around a transit (`benchmarks/bench_oblate.py`, M2 Max):
+limb-darkening pole (and one more where the planet crosses the limb),
+which the GPU kernel seeds from the closed-form (Ferrari) solution and
+polishes. Fused float32 kernels, 512 chains × 5,000 points around a
+transit (`benchmarks/bench_oblate.py`, M2 Max):
 
 | | forward | vs spherical | value + gradient | vs spherical |
 |---|---:|---:|---:|---:|
-| hybrid2, one evaluation per point | 16 ms | 16× | 44 ms | 30× |
-| hybrid5, one evaluation per point | 28 ms | 31× | 77 ms | 37× |
-| hybrid2, contact rule (`n_gl = 5`) | 481 ms | 83× | 1.31 s | 85× |
-| hybrid5, contact rule (`n_gl = 5`) | 867 ms | 85× | 2.38 s | 80× |
+| hybrid2, one evaluation per point | 9.9 ms | 15× | 31.5 ms | 22× |
+| hybrid4, one evaluation per point | 15.7 ms | 20× | 46.4 ms | 29× |
+| hybrid5, one evaluation per point | 20.0 ms | 22× | 62.3 ms | 32× |
+| hybrid2, contact rule (`n_gl = 5`) | 314 ms | 54× | 946 ms | 61× |
+| hybrid4, contact rule (`n_gl = 5`) | 494 ms | 60× | 1.45 s | 63× |
+| hybrid5, contact rule (`n_gl = 5`) | 631 ms | 61× | 1.94 s | 65× |
 
 The contact-rule ratio is large because the spherical hybrid kernel is
-unusually cheap per quadrature node (about 0.2 ns, against 7–14 ns for
+unusually cheap per quadrature node (about 0.1 ns, against 5–10 ns for
 the oblate one). In absolute terms, an oblate light curve of a few
 thousand points takes milliseconds.
 
@@ -60,13 +63,14 @@ limb-darkening profile that all four codes express exactly
 | | Elómë float32 (GPU) | GreenLantern (GPU) | JoJo | squishyplanet | Elómë float64 (CPU) |
 |---|---:|---:|---:|---:|---:|
 | error vs 30-digit integral | $7\times10^{-8}$ | $4.5\times10^{-6}$ | $2\times10^{-15}$ | $9\times10^{-16}$ | $1\times10^{-16}$ |
-| one light curve, $N = 10^3$ | 1.6 ms | 0.9 ms | 0.7 ms | 4.0 ms | 14 ms |
-| one light curve, $N = 10^5$ | 1.8 ms | 24 ms | 47 ms | 410 ms | 443 ms |
-| one light curve, $N = 10^7$ | 55 ms | 2.3 s | 7.0 s | 44 s | 48 s |
-| 512 sets × $10^4$ points | 0.03 s | 1.2 s | 2.7 s | 31 s | |
-| value + gradient, $N = 10^5$ | 4.3 ms | 54 ms | no gradients | 2.5 s | |
+| one light curve, $N = 10^3$ | 0.45 ms | 0.81 ms | 0.64 ms | 3.9 ms | 13 ms |
+| one light curve, $N = 10^5$ | 0.81 ms | 24 ms | 45 ms | 374 ms | 468 ms |
+| one light curve, $N = 10^7$ | 35 ms | 2.3 s | 6.1 s | 41 s | 47 s |
+| 512 sets × $10^4$ points | 0.020 s | 1.2 s | 2.5 s | 29 s | |
+| value + gradient, $N = 10^5$ | 2.8 ms | 54 ms | no gradients | 2.5 s | |
 
-Below about $10^4$ points the GPU's fixed dispatch cost lets the CPU
-codes win. The other codes cover what Elómë does not: the standard
+Elómë's float32 kernel is the fastest at every size measured; below
+about $10^4$ points its time is mostly the GPU's fixed dispatch cost.
+The other codes cover what Elómë does not: the standard
 quadratic law (all three), polynomial laws of any order and phase curves
 (squishyplanet), and triaxial planets (squishyplanet, GreenLantern).

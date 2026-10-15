@@ -591,7 +591,8 @@ u_to_q_np(u1, u2)
 ```text
 Inverse map (host-side, for building initial states from u guesses).
 
-q1 = (u1 + u2)^2, q2 = u1 / (2 (u1 + u2)).
+q1 = (u1 + u2)^2, q2 = u1 / (2 (u1 + u2)). At the uniform disc,
+u1 = u2 = 0, every q2 maps to the same u, and 0.5 is returned.
 ```
 
 ### `hybrid2_from_q`
@@ -658,6 +659,10 @@ q_from_simplex_np(w)
 
 ```text
 Inverse of simplex_from_q_np (host-side, for initial states).
+
+Once the stick is used up (sum w = 1 reached before the last weight),
+the remaining q are undetermined -- every value maps to the same w --
+and 0.5 is returned for them.
 ```
 
 ### `HybridLaw`

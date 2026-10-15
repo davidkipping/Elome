@@ -5,6 +5,31 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.16.3] — 2026-10-15
+
+### Changed
+- **Oblate planets are 1.2-1.6x faster in float32.** Each quartic's roots
+  (the limb crossings and one per limb-darkening pole) are now seeded by
+  Ferrari's closed form and polished (Aberth, then six Newton steps), with
+  the balanced QR eigensolver only as the fallback for a quartic that fails
+  the check. That replaces one QR per point plus level-to-level warm
+  starts, which failed the check on most partial-overlap points and then
+  paid a second QR. Nearly circular planets (|S2| < 3e-3 |S1|, where the
+  closed form cancels in float32) keep the previous method, bitwise.
+  Accuracy is unchanged: against the float64 reference, on 60,000 random
+  geometries, the overlap and tangency stress sets and 24 light-curve
+  configurations, the new and old kernels are at parity; spherical and
+  float64 outputs are bitwise unchanged. Measured at 512 x 5,000: hybrid4
+  forward 22.8 -> 16.0 ms without exposure integration; hybrid2 forward with
+  the contact rule 481 -> 314 ms.
+
+### Documentation
+- Oblate timings re-measured on a quiet machine (the cost table, the
+  ratios to spherical planets, the comparison with other oblate-planet
+  codes, where Elómë's float32 kernel is now the fastest at every size
+  measured); the tutorials re-executed. The cross-code report states its
+  small-N result from the data.
+
 ## [0.16.2] — 2026-10-13
 
 Fixes from a review of the package.

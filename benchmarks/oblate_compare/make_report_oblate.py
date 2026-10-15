@@ -72,9 +72,20 @@ def main():
                 if "10000000" in v and c != "elome_fp32"]
         L += ["", "At N = 10^7 Elómë's fp32 kernel is " + ", ".join(
             f"{x:,.0f}x faster than {n}" for n, x in sorted(rows, key=lambda q: q[1])) + "."]
-    L += ["", "Below ~10^4 points the GPU dispatch floor (~1.6 ms, including the "
-          "per-call contact solve) dominates Elómë's fp32 route and the CPU "
-          "codes are faster, as for spherical planets.", "",
+    # where (if anywhere) another code beats the fp32 kernel: stated from the data
+    ef = s.get("elome_fp32", {})
+    lose = [int(nn) for nn in ef
+            if any(str(nn) in v and v[str(nn)] < ef[nn] for c, v in s.items()
+                   if c not in ("elome_fp32", "elome_fp64"))]
+    if lose:
+        L += ["", f"At N <= {max(lose):,d} the GPU dispatch floor "
+              f"({ef[str(min(int(k) for k in ef))] * 1e3:.2f} ms at the smallest N) "
+              "lets a CPU code win."]
+    else:
+        L += ["", "Elómë's fp32 kernel is the fastest code at every N measured; "
+              f"at the smallest, its {ef[str(min(int(k) for k in ef))] * 1e3:.2f} ms "
+              "is mostly the GPU dispatch floor."]
+    L += ["",
           f"## Many parameter sets: {BATCH_NPV} sets x {BATCH_NPT:,d} points", "",
           "| code | wall | curves/s | how |", "|---|---:|---:|---|"]
     how = {"elome_fp32": "TransitModel.light_curves, one launch",
