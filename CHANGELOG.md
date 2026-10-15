@@ -5,6 +5,26 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.17.1] — 2026-10-15
+
+### Fixed
+- `hybrid4_to_q_np` raises for weights outside hybrid4's curvature
+  simplex, which have no q. It returned q outside [0, 1], which the
+  forward map clamped into a different profile. Weights converted from
+  earlier versions (`w = w_old @ inv(HYBRID4_BASIS)`) land outside when
+  the profile is convex in mu^2 somewhere.
+- The numpy prior maps (`hybrid2_from_q_np`, `hybrid4_from_q_np`,
+  `simplex_from_q_np`) no longer clamp q >= 1e-12, so q on a face of the
+  cube gives its weights exactly; the clamp moved depth and vertices by
+  up to 1e-3. The MLX maps keep it, for a finite gradient.
+- `HybridLaw(mix=)` requires each row to sum to 1, so every shape is 1
+  at the limb and I(0)/I(1) = 1 - sum w holds.
+
+### Documentation
+- The hybrid-law pages and docstrings write the law's shapes as S_j (for
+  hybrid4 its curvature basis), keeping T_j for its terms, and say that
+  hybrid4's curvature simplex is a subset of its physical profiles.
+
 ## [0.17.0] — 2026-10-15
 
 ### Changed

@@ -14,9 +14,9 @@ limb-darkening law gives the intensity $I(\mu)$. Set the law with
 | `"linear"` | `[u1]` | $1 - u_1(1-\mu)$ |
 | `"quadratic"` | `[u1, u2]` | $1 - u_1(1-\mu) - u_2(1-\mu)^2$ |
 | `"polynomial"` | `[u1, ..., uN]`, any $N$ | $1 - \sum_n u_n (1-\mu)^n$ |
-| `"hybrid2"` | 2 weights | $1 - \sum_j w_j T_j(\mu)$ |
-| `"hybrid4"` | 4 weights | $1 - \sum_j w_j T_j(\mu)$ |
-| `"hybrid5"` | 5 weights | $1 - \sum_j w_j T_j(\mu)$ |
+| `"hybrid2"` | 2 weights | $1 - \sum_j w_j S_j(\mu)$ |
+| `"hybrid4"` | 4 weights | $1 - \sum_j w_j S_j(\mu)$ |
+| `"hybrid5"` | 5 weights | $1 - \sum_j w_j S_j(\mu)$ |
 
 Every law has an exact, closed-form light curve and analytic gradients in
 its coefficients. The coefficients may change between calls on a built
@@ -47,29 +47,32 @@ The definitions of the hybrid laws are in {doc}`../reference/hybrid-laws`.
 
 ### Shape weights
 
-The hybrid laws are written in a *shape basis*. Each term $T_j(\mu)$
+The hybrid laws are written in a *shape basis*. Each shape $S_j(\mu)$
 falls from 1 at the limb to 0 at the centre, so its weight $w_j$ is
-simply the share of the centre-to-limb drop that the term carries:
+simply the share of the centre-to-limb drop that the shape carries:
 
 $$
-\frac{I(\mu)}{I(1)} = 1 - \sum_j w_j T_j(\mu), \qquad
+\frac{I(\mu)}{I(1)} = 1 - \sum_j w_j S_j(\mu), \qquad
 \frac{I(0)}{I(1)} = 1 - \sum_j w_j .
 $$
 
-For `hybrid4` the terms are its *curvature basis*: $T_1 = 1 - \mu^2$,
-$T_2 = (1 - \mu^2)^2$, and two pole-dominated shapes. In that basis the
-simplex $w_j \ge 0$, $\sum_j w_j \le 1$ is *exactly* the set of `hybrid4`
+For `hybrid2` and `hybrid5` the shapes are the law's terms (powers of
+$\mu^2$ and normalised poles). For `hybrid4` they are its *curvature
+basis*: $S_1 = 1 - \mu^2$, $S_2 = (1 - \mu^2)^2$, and two pole-dominated
+shapes, each a fixed combination of its terms. In that basis the simplex
+$w_j \ge 0$, $\sum_j w_j \le 1$ is *exactly* the set of `hybrid4`
 profiles that are non-negative, darker towards the limb, concave in
 $\mu^2$ and of convex slope in $\mu^2$: every point of it is such a
-profile, and every such profile is in it. For `hybrid5` the same simplex
+profile, and every such profile is in it. A physical profile that is
+convex in $\mu^2$ lies outside it. For `hybrid5` the same simplex
 guarantees a non-negative profile that darkens towards the limb. For
-`hybrid2` the physical region is a triangle.
+`hybrid2` the physical region is an exact triangle.
 
 ## Priors on the coefficients
 
 Sampling the coefficients directly lets chains wander into unphysical
 profiles. Each law has a map from the unit cube, where a uniform prior
-is easy, onto its physical region, uniformly:
+is easy, onto a region of physical profiles, uniformly:
 
 | law | map | inverse |
 |---|---|---|

@@ -60,8 +60,8 @@ def u_to_q_np(u1, u2):
 
 
 # ---------------------------------------------------------------------------
-# hybrid laws (elome/hybrid.py): uniform priors on their physical
-# regions
+# hybrid laws (elome/hybrid.py): uniform priors -- on hybrid2's exact
+# physical triangle, hybrid4's curvature simplex and hybrid5's simplex
 # ---------------------------------------------------------------------------
 
 def _hybrid2_pole(eps=None, law=None) -> float:
@@ -117,9 +117,10 @@ def hybrid2_from_q(q1: mx.array, q2: mx.array, eps=None, law=None):
 
 
 def hybrid2_from_q_np(q1, q2, eps=None, law=None):
-    """Float64 host-side replica of hybrid2_from_q."""
+    """Float64 host-side replica of hybrid2_from_q, without its clamp:
+    exact on the edges of the square (no gradient is taken here)."""
     Vc, Vl = hybrid2_vertices(eps, law)
-    s = np.sqrt(np.maximum(np.asarray(q1, dtype=np.float64), 1e-12))
+    s = np.sqrt(np.asarray(q1, dtype=np.float64))
     q2 = np.asarray(q2, dtype=np.float64)
     return (s * ((1.0 - q2) * Vc[0] + q2 * Vl[0]),
             s * ((1.0 - q2) * Vc[1] + q2 * Vl[1]))
@@ -162,8 +163,10 @@ def hybrid4_from_q(q: mx.array) -> mx.array:
 
 
 def hybrid4_from_q_np(q):
-    """Float64 host-side replica of hybrid4_from_q."""
-    q = np.maximum(np.asarray(q, dtype=np.float64), 1e-12)
+    """Float64 host-side replica of hybrid4_from_q, without its clamp:
+    exact on the faces of the cube, so tabulated q on a face give their
+    tabulated w (no gradient is taken here)."""
+    q = np.asarray(q, dtype=np.float64)
     s = q[..., 0] ** 0.25
     a, b, q4 = q[..., 1] ** (1.0 / 3.0), np.sqrt(q[..., 2]), q[..., 3]
     return np.stack([s * (1.0 - a), s * a * (1.0 - b),
@@ -174,8 +177,18 @@ def hybrid4_to_q_np(w):
     """Inverse of hybrid4_from_q_np (host-side, for initial states):
     q1 = s^4, q2 = (1 - w1/s)^3, q3 = (1 - w2/(s - w1))^2,
     q4 = w4/(w3 + w4), s = sum w. A coordinate left undetermined (s = 0,
-    s = w1 or w3 + w4 = 0: every value maps to the same w) is 0.5."""
+    s = w1 or w3 + w4 = 0: every value maps to the same w) is 0.5.
+
+    w must lie in the curvature simplex (w_j >= 0, sum w_j <= 1): weights
+    outside it -- a profile convex in mu^2 somewhere, which hybrid4's
+    weights can describe but its prior excludes -- have no q, and raise."""
     w = np.asarray(w, dtype=np.float64)
+    if (w < -1e-12).any() or (w.sum(-1) > 1.0 + 1e-12).any():
+        raise ValueError(
+            "w is outside hybrid4's curvature simplex (w_j >= 0, sum w_j "
+            "<= 1), so it has no q: its profile is not positive, monotonic, "
+            "concave in mu^2 and of convex slope in mu^2")
+    w = np.maximum(w, 0.0)
     s = w.sum(-1)
     w1, w2, w3, w4 = (w[..., j] for j in range(4))
     half = lambda x: np.full(np.shape(x), 0.5)
@@ -186,13 +199,13 @@ def hybrid4_to_q_np(w):
     q3 = np.where(rest != 0.0, q3, 0.5)
     pole = w3 + w4
     q4 = np.divide(w4, pole, out=half(pole), where=pole != 0.0)
-    return np.stack([s ** 4, q2, q3, q4], axis=-1)
+    return np.stack([np.minimum(s, 1.0) ** 4, q2, q3, q4], axis=-1)
 
 
 def simplex_from_q(q: mx.array) -> mx.array:
     """q (..., n) in [0,1]^n -> w (..., n) uniform on the simplex
-    {w_j >= 0, sum w_j <= 1} (hybrid5's physical region; hybrid4's prior
-    is ``hybrid4_from_q``), by stick-
+    {w_j >= 0, sum w_j <= 1} (hybrid5's prior, every point of which is a
+    physical profile; hybrid4's prior is ``hybrid4_from_q``), by stick-
     breaking a flat Dirichlet: w_j = (1 - q_j^(1/(n-j))) prod_{i<j}
     q_i^(1/(n-i)). MLX ops; q clamped away from 0 for a finite gradient."""
     n = q.shape[-1]
@@ -207,8 +220,9 @@ def simplex_from_q(q: mx.array) -> mx.array:
 
 
 def simplex_from_q_np(q):
-    """Float64 host-side replica of simplex_from_q."""
-    q = np.maximum(np.asarray(q, dtype=np.float64), 1e-12)
+    """Float64 host-side replica of simplex_from_q, without its clamp:
+    exact on the faces of the cube (no gradient is taken here)."""
+    q = np.asarray(q, dtype=np.float64)
     n = q.shape[-1]
     w = np.empty_like(q)
     stick = np.ones(q.shape[:-1])

@@ -91,7 +91,8 @@ dev = (B @ c) / (math.pi * (1 - u1 / 3 - u2 / 6))   # equals the ordinary call
 ```
 
 For a hybrid law the basis is its shape-basis columns,
-$[E_0, T_1, \ldots, T_n]$, with $c = (1, -w)$ and $N$ from
+$[E_0, S_1, \ldots, S_n]$ (for `hybrid4`, its curvature basis), with
+$c = (1, -w)$ and $N$ from
 `elome.hybrid_norms(law)`:
 
 ```python

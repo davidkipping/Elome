@@ -12,7 +12,7 @@ from elome.hybrid import get_law
 
 def phys_w(law, rng, n=None):
     """One weight vector (n None) or an (n, n_w) batch, uniform on the
-    law's physical region."""
+    law's prior region: every one a physical profile."""
     L = get_law(law)
     if L.is_hybrid2_type:
         w = ld.hybrid2_from_q_np(rng.random(n), rng.random(n), law=L)

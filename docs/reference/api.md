@@ -615,7 +615,8 @@ hybrid2_from_q_np(q1, q2, eps=None, law=None)
 ```
 
 ```text
-Float64 host-side replica of hybrid2_from_q.
+Float64 host-side replica of hybrid2_from_q, without its clamp:
+exact on the edges of the square (no gradient is taken here).
 ```
 
 ### `hybrid2_to_q_np`
@@ -657,7 +658,9 @@ hybrid4_from_q_np(q)
 ```
 
 ```text
-Float64 host-side replica of hybrid4_from_q.
+Float64 host-side replica of hybrid4_from_q, without its clamp:
+exact on the faces of the cube, so tabulated q on a face give their
+tabulated w (no gradient is taken here).
 ```
 
 ### `hybrid4_to_q_np`
@@ -671,6 +674,10 @@ Inverse of hybrid4_from_q_np (host-side, for initial states):
 q1 = s^4, q2 = (1 - w1/s)^3, q3 = (1 - w2/(s - w1))^2,
 q4 = w4/(w3 + w4), s = sum w. A coordinate left undetermined (s = 0,
 s = w1 or w3 + w4 = 0: every value maps to the same w) is 0.5.
+
+w must lie in the curvature simplex (w_j >= 0, sum w_j <= 1): weights
+outside it -- a profile convex in mu^2 somewhere, which hybrid4's
+weights can describe but its prior excludes -- have no q, and raise.
 ```
 
 ### `simplex_from_q`
@@ -681,8 +688,8 @@ simplex_from_q(q: mx.array) -> mx.array
 
 ```text
 q (..., n) in [0,1]^n -> w (..., n) uniform on the simplex
-{w_j >= 0, sum w_j <= 1} (hybrid5's physical region; hybrid4's prior
-is ``hybrid4_from_q``), by stick-
+{w_j >= 0, sum w_j <= 1} (hybrid5's prior, every point of which is a
+physical profile; hybrid4's prior is ``hybrid4_from_q``), by stick-
 breaking a flat Dirichlet: w_j = (1 - q_j^(1/(n-j))) prod_{i<j}
 q_i^(1/(n-i)). MLX ops; q clamped away from 0 for a finite gradient.
 ```
@@ -694,7 +701,8 @@ simplex_from_q_np(q)
 ```
 
 ```text
-Float64 host-side replica of simplex_from_q.
+Float64 host-side replica of simplex_from_q, without its clamp:
+exact on the faces of the cube (no gradient is taken here).
 ```
 
 ### `q_from_simplex_np`
@@ -726,8 +734,9 @@ the monomial columns (mu^0, mu^2, mu^4): (1, -1, 0) is 1 - mu^2,
 Pi_eps follow, one per entry of ``eps``, in that order: together they
 are the terms T = (even shapes..., pole shapes...).
 
-``mix`` (optional, n_w x n_w, invertible) makes the law's shapes the
-combinations S_k = sum_j mix[k][j] T_j, and its weights refer to those:
+``mix`` (optional, n_w x n_w, invertible, rows summing to 1) makes the
+law's shapes the combinations S_k = sum_j mix[k][j] T_j, and its
+weights refer to those:
 I/I(1) = 1 - sum_k w_k S_k. Without it the shapes are T themselves.
 hybrid4's ``mix`` is its curvature basis (``hybrid4_basis``).
 ```
@@ -895,8 +904,9 @@ shape_cols(z: mx.array, r, law) -> mx.array
 ```
 
 ```text
-The shape-basis columns B = [E0, T_1..T_n], stacked on a trailing
-axis: shape z.shape + (1 + n_w,). Deviation form; 0 out of transit.
+The shape-basis columns B = [E0, S_1..S_n] (S_j the law's shapes:
+for hybrid4 its curvature basis), stacked on a trailing axis: shape
+z.shape + (1 + n_w,). Deviation form; 0 out of transit.
 ```
 
 ### `flux_dev_oblate`

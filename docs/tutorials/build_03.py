@@ -130,10 +130,10 @@ median light-curve error is 1.8 ppm for `hybrid4` and 1.1 ppm for
 `hybrid5`, against 2.0 ppm for Claret's four-parameter law.
 
 Their coefficients `u` are **shape weights**: each is the share of the
-centre-to-limb drop its term carries, so $I(0)/I(1) = 1 - \sum w$, and
-the physical region is a simplex. `simplex_from_q_np` maps the unit cube
-onto it (uniform), which is what you want for a prior; `hybrid4` has its
-own map, `hybrid4_from_q_np`, onto its curvature simplex.
+centre-to-limb drop its shape carries, so $I(0)/I(1) = 1 - \sum w$.
+`simplex_from_q_np` maps the unit cube uniformly onto `hybrid5`'s simplex
+of physical weights, which is what you want for a prior; `hybrid4` has
+its own map, `hybrid4_from_q_np`, onto its curvature simplex.
 
 The hybrid laws matter for Part B: **they are the only laws an oblate
 planet can use.**

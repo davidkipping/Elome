@@ -60,8 +60,8 @@ def law_shapes(law, mu):
 
 
 def phys_w(law, seed):
-    """A weight vector inside the physical region (triangle / simplex),
-    chosen by the law's structure (hybrid_weights)."""
+    """A weight vector inside the law's prior region (hybrid2's triangle,
+    hybrid4's curvature simplex, the simplex otherwise; hybrid_weights)."""
     return _phys_w(law, np.random.default_rng(seed))
 
 
@@ -142,8 +142,8 @@ class TestDefinitions:
 
     @pytest.mark.parametrize("name", NAMES)
     def test_shape_form_equals_expanded_form(self, name):
-        """I/I(1) = 1 - sum w_j T_j(mu), each T_j from 1 at the limb to 0
-        at the centre; and the expanded c-form agrees on a mu grid."""
+        """I/I(1) = 1 - sum w_j S_j(mu), each shape S_j from 1 at the limb
+        to 0 at the centre; and the expanded c-form agrees on a mu grid."""
         law = LAWS[name]
         w = phys_w(law, 2)
         mu = np.linspace(0.0, 1.0, 101)
@@ -552,7 +552,7 @@ class TestPriors:
         with pytest.raises(ValueError, match="not both"):
             ld.hybrid2_from_q_np(0.5, 0.5, eps=0.2, law=custom)
 
-    @pytest.mark.parametrize("n", [4, 5])
+    @pytest.mark.parametrize("n", [3, 5])
     def test_simplex(self, n):
         rng = np.random.default_rng(2)
         q = rng.random((20000, n))
@@ -564,10 +564,14 @@ class TestPriors:
         with mx.stream(mx.cpu):
             wm = np.asarray(ld.simplex_from_q(f64(q[:50])))
         assert np.allclose(wm, w[:50], atol=1e-15)
-        law = HYBRID4 if n == 4 else HYBRID5
+
+    def test_simplex_profiles_are_physical(self):
+        """simplex_from_q is hybrid5's prior: every sample is a
+        non-negative profile that darkens towards the limb."""
+        w = ld.simplex_from_q_np(np.random.default_rng(2).random((20, 5)))
         mu = np.linspace(0, 1, 201)
-        for k in range(0, 20000, 1000):
-            I = intensity_np(law, w[k], mu)
+        for wk in w:
+            I = intensity_np(HYBRID5, wk, mu)
             assert (I >= -1e-12).all() and (np.diff(I) >= -1e-12).all()
 
 
@@ -590,9 +594,9 @@ class TestPriorInversesAtCorners:
         from elome import q_from_simplex_np, simplex_from_q_np
         q = q_from_simplex_np(w)
         assert np.isfinite(q).all() and ((q >= 0) & (q <= 1)).all()
-        # the forward map clamps q >= 1e-12 (a finite gradient), so a vertex
-        # is reached to within (1e-12)^(1/n) ~ 1e-3, not exactly
-        np.testing.assert_allclose(simplex_from_q_np(q), w, atol=2e-3)
+        # the numpy map does not clamp (only the MLX one, for a gradient):
+        # a vertex is reached exactly
+        np.testing.assert_allclose(simplex_from_q_np(q), w, atol=1e-15)
 
     def test_interior_unchanged(self):
         from elome import q_from_simplex_np, simplex_from_q_np, u_to_q_np
@@ -665,7 +669,7 @@ class TestHybrid4CurvatureBasis:
             gp1 = 2 * S[2] + 6 * (S[3:] * (1 + e) ** -4).sum()
             assert abs(g1) < 1e-12 and abs(gp1) < 1e-12
 
-    def test_simplex_is_exactly_the_physical_region(self):
+    def test_simplex_is_exactly_the_curvature_region(self):
         """Precision and recall: over a box around the simplex, a weight
         vector meets the four conditions if and only if it is in the
         simplex (points within 0.01 of a facet excluded)."""
@@ -718,14 +722,31 @@ class TestHybrid4CurvatureBasis:
     def test_prior_inverse_at_corners(self, w):
         q = ld.hybrid4_to_q_np(w)
         assert np.isfinite(q).all() and ((q >= 0) & (q <= 1)).all()
-        # the forward map clamps q >= 1e-12, so corners are reached to ~1e-3
-        np.testing.assert_allclose(ld.hybrid4_from_q_np(q), w, atol=2e-3)
+        # the numpy map does not clamp: tabulated q on a face give their w
+        np.testing.assert_allclose(ld.hybrid4_from_q_np(q), w, atol=1e-15)
+
+    def test_prior_inverse_refuses_weights_outside(self):
+        """Weights outside the curvature simplex have no q: raise rather
+        than return q outside [0, 1] that the forward map clamps into
+        another profile. One such is 1 - 0.5 (1 - mu^4), physical but
+        convex in mu^2."""
+        w_convex = np.array([0.5, 0, 0, 0]) @ np.linalg.inv(H.HYBRID4_BASIS)
+        mu = np.linspace(0, 1, 201)
+        I = intensity_np(HYBRID4, w_convex, mu)
+        np.testing.assert_allclose(I, 1 - 0.5 * (1 - mu ** 4), atol=1e-12)
+        for w in (w_convex, [0.6, 0.6, 0, 0], [-0.1, 0.2, 0.2, 0.2]):
+            with pytest.raises(ValueError, match="curvature simplex"):
+                ld.hybrid4_to_q_np(w)
+        q = ld.hybrid4_to_q_np([1e-17, -1e-17, 0.3, 0.3])   # rounding: accepted
+        assert ((q >= 0) & (q <= 1)).all()
 
     def test_mix_validation(self):
         with pytest.raises(ValueError, match="mix must be 4 x 4"):
             HybridLaw("bad", HYBRID4.eps, HYBRID4.shapes, mix=np.eye(3))
         with pytest.raises(ValueError, match="invertible"):
             HybridLaw("bad", HYBRID4.eps, HYBRID4.shapes, mix=np.zeros((4, 4)))
+        with pytest.raises(ValueError, match="sum to 1"):
+            HybridLaw("bad", HYBRID4.eps, HYBRID4.shapes, mix=2 * np.eye(4))
         plain = HybridLaw("plain", HYBRID4.eps, HYBRID4.shapes, mix=np.eye(4))
         assert plain.mix is None
         assert plain.definition == HybridLaw("p2", HYBRID4.eps, HYBRID4.shapes).definition

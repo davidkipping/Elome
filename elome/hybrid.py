@@ -8,16 +8,16 @@ from a few even powers of mu and "double-pole" terms
 which are infinite only at a projected radius sqrt(1 + eps) *outside* the
 star and so rise steeply at the limb, the way a real profile does and a
 polynomial in mu^2 cannot. Three members are named, each written in a
-*shape basis* in which every term falls from 1 at the limb to 0 at the
-centre, so each weight is simply the share of the centre-to-limb drop its
-term carries:
+*shape basis* in which every shape S_j falls from 1 at the limb to 0 at
+the centre, so each weight is simply the share of the centre-to-limb drop
+its shape carries:
 
-    I(mu) / I(1) = 1 - sum_j w_j T_j(mu),          I(0) / I(1) = 1 - sum_j w_j
+    I(mu) / I(1) = 1 - sum_j w_j S_j(mu),          I(0) / I(1) = 1 - sum_j w_j
 
-    hybrid2 :  T = {1 - mu^2,  Pi_0.36}                            2 weights
+    hybrid2 :  S = T = {1 - mu^2,  Pi_0.36}                        2 weights
     hybrid4 :  S = B T,  T = {1 - mu^4,  (1 - mu^2)^2,  Pi_eps0, Pi_eps1}
                                                                    4 weights
-    hybrid5 :  T = {1 - mu^4,  (1 - mu^2)^2,  Pi_eps0..2}          5 weights
+    hybrid5 :  S = T = {1 - mu^4,  (1 - mu^2)^2,  Pi_eps0..2}      5 weights
 
     Pi_eps(mu) = [P_eps(mu) - (1 + eps)^-2] / N_eps,   N_eps = eps^-2 - (1 + eps)^-2,
 
@@ -28,14 +28,17 @@ and hybrid2's single pole at eps = 0.36, both tuned over PHOENIX and
 MPS-ATLAS models in 37 passbands in the hybrid-law coefficients paper (in
 preparation). Out of sample there (8,100 model-bands, median light-curve
 error) hybrid4 reaches 1.8 ppm and hybrid5 1.1 ppm, against 2.0 ppm for
-the Claret four-parameter law. hybrid4's shapes S1..S4 are its curvature
+the Claret four-parameter law. T are the terms; the shapes S are the
+terms themselves except for hybrid4, whose shapes S1..S4 are its curvature
 basis (``hybrid4_basis``: S1 = 1 - mu^2, S2 = (1 - mu^2)^2, S3, S4 pole-
 dominated), in which the simplex w_j >= 0, sum w_j <= 1 is *exactly* the
 set of its profiles that are positive, monotonic, concave in mu^2 and of
-convex slope in mu^2. The physical region is an exact triangle for hybrid2,
-that simplex for hybrid4, and for hybrid5 the simplex w_j >= 0,
-sum w_j <= 1 (``ld.hybrid2_from_q``, ``ld.hybrid4_from_q``,
-``ld.simplex_from_q`` sample them uniformly).
+convex slope in mu^2 -- a subset of its physical (positive, monotonic)
+profiles: one convex in mu^2, such as 1 - 0.5 (1 - mu^4), lies outside.
+The priors (``ld.hybrid2_from_q``, ``ld.hybrid4_from_q``,
+``ld.simplex_from_q``) are uniform on hybrid2's exact physical triangle,
+on hybrid4's curvature simplex, and on hybrid5's simplex w_j >= 0,
+sum w_j <= 1, every point of which is physical.
 
 Why they are cheap here. The laws were designed so an *oblate* planet's
 light curve is elementary; for the spherical planet this package handles,
@@ -57,12 +60,12 @@ Every column is computed in *deviation* form (visible minus full-disk,
 i.e. minus the occulted flux: negative, exactly 0 out of transit), the
 package's float32 discipline, and the law is assembled in the shape form
 
-    F - 1 = (E0 - sum_j w_j T_j) / (pi - sum_j w_j N_j)
+    F - 1 = (E0 - sum_j w_j S_j) / (pi - sum_j w_j N_j)
 
 whose columns are all O(depth) -- the expanded coefficient form carries the
 pole's eps^-2 scale (3.9e5 for hybrid5's innermost pole) and is kept only
 for cross-checks (``w_to_c``). The ``ld_basis`` contract of the quadratic
-law carries over unchanged: with B = [E0, T_1..T_n], c = (1, -w) and
+law carries over unchanged: with B = [E0, S_1..S_n], c = (1, -w) and
 N = ``hybrid_norms``, flux - 1 == (B @ c) / (N @ c).
 
 Numerics of the pole term (partial-overlap regime), with
@@ -155,8 +158,9 @@ class HybridLaw:
     Pi_eps follow, one per entry of ``eps``, in that order: together they
     are the terms T = (even shapes..., pole shapes...).
 
-    ``mix`` (optional, n_w x n_w, invertible) makes the law's shapes the
-    combinations S_k = sum_j mix[k][j] T_j, and its weights refer to those:
+    ``mix`` (optional, n_w x n_w, invertible, rows summing to 1) makes the
+    law's shapes the combinations S_k = sum_j mix[k][j] T_j, and its
+    weights refer to those:
     I/I(1) = 1 - sum_k w_k S_k. Without it the shapes are T themselves.
     hybrid4's ``mix`` is its curvature basis (``hybrid4_basis``).
     """
@@ -179,6 +183,12 @@ class HybridLaw:
                                  f"{m.shape}")
             if abs(np.linalg.det(m)) < 1e-12:
                 raise ValueError(f"{self.name}: mix must be invertible")
+            # every term is 1 at the limb, so rows summing to 1 keep every
+            # shape 1 there: I(0)/I(1) = 1 - sum w, and the priors hold
+            if not np.allclose(m.sum(axis=1), 1.0, rtol=0.0, atol=1e-9):
+                raise ValueError(f"{self.name}: each row of mix must sum to 1 "
+                                 "(every shape is 1 at the limb); got row "
+                                 f"sums {m.sum(axis=1)}")
             # the identity is no mixing: the same definition as none
             mix = None if np.array_equal(m, np.eye(self.n_w)) else tuple(
                 tuple(float(c) for c in row) for row in m)
@@ -195,8 +205,8 @@ class HybridLaw:
     @property
     def is_hybrid2_type(self) -> bool:
         """hybrid2's structure -- shapes {1 - mu^2} and one pole -- whose
-        physical region is an exact triangle (ld.hybrid2_from_q) rather than
-        the simplex of the other laws."""
+        prior is its exact physical triangle (ld.hybrid2_from_q) rather than
+        a simplex, as for the other laws."""
         return (len(self.eps) == 1 and self.shapes == ((1.0, -1.0, 0.0),)
                 and self.mix is None)
 
@@ -566,8 +576,9 @@ def _shape_terms(z, r, law):
 
 @fp64_on_cpu(any_arg=True)
 def shape_cols(z: mx.array, r, law) -> mx.array:
-    """The shape-basis columns B = [E0, T_1..T_n], stacked on a trailing
-    axis: shape z.shape + (1 + n_w,). Deviation form; 0 out of transit."""
+    """The shape-basis columns B = [E0, S_1..S_n] (S_j the law's shapes:
+    for hybrid4 its curvature basis), stacked on a trailing axis: shape
+    z.shape + (1 + n_w,). Deviation form; 0 out of transit."""
     cols, _, _ = _shape_terms(z, r, get_law(law))
     return mx.stack(cols, axis=-1)
 
@@ -595,9 +606,9 @@ def flux_dev_hybrid(z: mx.array, r, w, law) -> mx.array:
 
 
 def combine_cols(cols, w, law) -> mx.array:
-    """F - 1 from the shape columns: (E0 - sum_j w_j T_j) / (pi - sum_j
+    """F - 1 from the shape columns: (E0 - sum_j w_j S_j) / (pi - sum_j
     w_j N_j), as one sequential expression. ``cols`` is the list
-    [E0, T_1..T_n] (each any shape) or the stacked (..., 1 + n_w) array
+    [E0, S_1..S_n] (each any shape) or the stacked (..., 1 + n_w) array
     (shape_cols' / ld_basis' form); ``w`` as flux_dev_hybrid takes it.
     THE off-kernel expression: flux_dev_hybrid, the z-kernel entry point's
     fallback and the fp64 tau graph all call it, so every route off the
@@ -607,7 +618,7 @@ def combine_cols(cols, w, law) -> mx.array:
              else len(cols))
     if n_col != 1 + law.n_w:
         raise ValueError(f"{law.name} has {1 + law.n_w} shape columns "
-                         f"[E0, T_1..T_{law.n_w}]; got {n_col} (another "
+                         f"[E0, S_1..S_{law.n_w}]; got {n_col} (another "
                          "law's basis?)")
     if isinstance(cols, mx.array):
         cols = [cols[..., j] for j in range(cols.shape[-1])]
