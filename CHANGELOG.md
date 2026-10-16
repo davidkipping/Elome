@@ -5,6 +5,30 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+### Added
+- `elome.rings`: transits of ringed planets, the float64 reference graph
+  and its float32 twin (not yet wired into `TransitModel` or the GPU
+  kernels). A flat circular ring in the planet's equatorial plane, given
+  by projected parameters like an oblate planet: `ring_in`, `ring_out`
+  (radii in units of `rp`), `ring_f` (projected flattening,
+  1 - |cos i|; uniform in it is the isotropic prior), the planet's
+  `theta`, and `ring_tau` (normal optical depth; inf is opaque). Exact
+  hybrid limb darkening: the occultor is a weighted region (1 in the
+  planet, 1 - exp(-tau / |cos i|) in the ring) whose flux follows from
+  Green's theorem as each outline's arcs weighted by the jump across
+  them, with the oblate solution's per-arc integrals. Up to four limb
+  crossings per outline (nearly edge-on rings), planet-ring corners in
+  closed form, analytic gradients in every parameter. Against two
+  independent brute-force integrations: <= 5e-16 (float64) and <= 5e-8
+  (float32) of each column's norm, including tangencies, a planet
+  centred on the star and rings to |cos i| = 1e-10.
+
+### Fixed
+- Oblate planets: an unused near-double-root slot in the pole integral
+  could, for some root configurations, give a NaN gradient in float32
+  (its stand-in factor took a live Newton step). No existing output
+  changes (all 1,432 regression arrays bitwise identical).
+
 ## [0.17.2] — 2026-10-15
 
 ### Documentation

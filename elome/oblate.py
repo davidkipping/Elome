@@ -375,10 +375,19 @@ def _g_dg(phi, x0, y0, a, b):
 
 def _crossings(x0, y0, a, b, dtype):
     """Limb crossings of the ellipse: (count, phi_a <= phi_b) on the
-    ellipse parameter. Candidates are roots of D at level 1 with |z| ~ 1,
-    polished by guarded Newton on g(phi) = s(phi) - 1 and accepted on the
-    residue; crossings closer than _PAIR_TOL are a tangency and dropped
-    together."""
+    ellipse parameter -- the first two of ``_limb_candidates``, sorted."""
+    phis, valid = _limb_candidates(x0, y0, a, b, dtype)
+    cnt = sum(v.astype(mx.int32) for v in valid)
+    key = mx.sort(mx.stack([mx.where(v, p, mx.inf) for v, p in zip(valid, phis)], -1), axis=-1)
+    return cnt, key[..., 0], key[..., 1]
+
+
+def _limb_candidates(x0, y0, a, b, dtype):
+    """All (up to four) limb crossings of the ellipse, as four candidate
+    angles on the ellipse parameter and their validity masks. Candidates
+    are roots of D at level 1 with |z| ~ 1, polished by guarded Newton on
+    g(phi) = s(phi) - 1 and accepted on the residue; crossings closer than
+    _PAIR_TOL are a tangency and dropped together."""
     S0, S1, S2, _, _ = _coeffs(x0, y0, a, b)
     z = _roots(S0, S1, S2, 1.0)
     sc = 1.0 + (mx.abs(x0) + a) ** 2 + (mx.abs(y0) + b) ** 2
@@ -404,10 +413,7 @@ def _crossings(x0, y0, a, b, dtype):
             close = valid[i] & valid[j] & (d < _PAIR_TOL[dtype])
             drop[i] = drop[i] | close
             drop[j] = drop[j] | close
-    valid = [v & ~d for v, d in zip(valid, drop)]
-    cnt = sum(v.astype(mx.int32) for v in valid)
-    key = mx.sort(mx.stack([mx.where(v, p, mx.inf) for v, p in zip(valid, phis)], -1), axis=-1)
-    return cnt, key[..., 0], key[..., 1]
+    return phis, [v & ~d for v, d in zip(valid, drop)]
 
 
 def _arcs(x0, y0, a, b, phi_a, phi_b):
@@ -652,6 +658,10 @@ def _pole_arc(S0, S1, S2, K0, K1, p, z0, lo, hi):
         sig0 = _cwhere(good, z1 + z2, 7.0).sg()
         pi0 = _cwhere(good, z1 * z2, 12.0).sg()
         sig, pi_ = _bairstow(dc, sig0, pi0)
+        # an unused slot keeps its stand-in factor: a live Bairstow step from
+        # it can land a root on the arc's ends, whose log would poison the
+        # masked lane's gradient (0 * inf)
+        sig, pi_ = _cwhere(good, sig, 7.0), _cwhere(good, pi_, 12.0)
         Q2 = dc[0]
         Q1 = S1 + sig * Q2
         Q0 = sig * Q1 + (S0 - p) - pi_ * Q2
