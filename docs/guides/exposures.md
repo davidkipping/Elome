@@ -38,11 +38,14 @@ A 29-minute exposure of a 0.126-day transit (`benchmarks/bench_exposure.py`):
 |---|---:|---:|
 | supersampling, $N = 101$ | 101 | $1.7\times10^{-5}$ |
 | supersampling, $N = 10{,}001$ | 10,001 | $1.7\times10^{-7}$ |
-| **contact rule, `n_gl = 5`** | **25** | $\mathbf{8.9\times10^{-8}}$ |
-| contact rule, `n_gl = 11` | 55 | $2.0\times10^{-9}$ |
+| **contact rule, `n_gl = 5`** | **5–25** | $\mathbf{8.9\times10^{-8}}$ |
+| contact rule, `n_gl = 11` | 11–55 | $2.0\times10^{-9}$ |
 
-To match the contact rule's 25 evaluations, supersampling needs about
-19,500, which is 780 times the work.
+Each piece takes `n_gl` evaluations: an exposure that no contact falls
+inside takes `n_gl`, and only one containing all four contacts takes
+5 `n_gl`. On the GPU, the empty pieces cost nothing. Even against the
+most, 25 evaluations, supersampling needs about 19,500 to match, 780
+times the work.
 
 - **Spherical planets, eccentric orbits.** The contacts are found
   exactly, by Newton steps on the orbit itself rather than by the usual

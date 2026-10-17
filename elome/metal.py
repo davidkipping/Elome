@@ -916,7 +916,10 @@ ORB_DECL
         for (int j = 0; j < ngl; ++j) {
             float w = hw * wg[j];
             float tt = mid + hw * xg[j];
-            ORB_Z(tt)
+            // a node of zero weight (an empty sub-interval of the contact
+            // split) adds exactly nothing: skip its evaluation
+            front = false;
+            if (w != 0.0f) { ORB_Z(tt) }
             float f = front ? mp_phot(z, r, u1, u2) : 0.0f;
             A += w * f;
             S += w;
@@ -956,7 +959,8 @@ ORB_DECL
             for (int j = 0; j < ngl; ++j) {
                 float w = hw * wg[j];
                 float tt = mid + hw * xg[j];
-                ORB_Z(tt)
+                front = false;
+                if (w != 0.0f) { ORB_Z(tt) }
                 if (front) A += w * mp_phot_b(z, r);
                 S += w;
             }
@@ -1024,7 +1028,8 @@ ORB_DECL
                 float dw = dhw * wg[j];
                 float tt = mid + hw * xg[j];
                 float dtt = dmid + dhw * xg[j];
-                ORB_ZD(tt)
+                front = false;
+                if (w != 0.0f || dw != 0.0f) { ORB_ZD(tt) }
                 float f = 0.0f, dfdtt = 0.0f;
                 if (front) {
                     f = mp_phot_d(z, r, u1, u2, &dFdz, &dFdr, &dFdu1, &dFdu2);

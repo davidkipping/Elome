@@ -116,16 +116,18 @@ axis outside the kernel. Reproduce: `python benchmarks/bench_tau_kernel.py`.
 
 | route | evals/pt | forward | value+grad | peak MB (v+g) | max abs error |
 |---|---:|---:|---:|---:|---:|
-| expanded axis, n_sub=15 | 15 | 41.0 ms | 99.7 ms | 2776 | 1.6e-4 |
-| in-kernel supersample, n_sub=15 | 15 | 14.5 ms | 28.0 ms | 51 | 1.6e-4 |
-| in-kernel contact, n_gl=5 | 25 | 24.4 ms | 43.9 ms | 51 | 1.3e-7 |
+| expanded axis, n_sub=15 | 15 | 19.6 ms | 59.0 ms | 2776 | 1.6e-4 |
+| in-kernel supersample, n_sub=15 | 15 | 6.8 ms | 15.5 ms | 51 | 1.6e-4 |
+| in-kernel contact, n_gl=5 | 5-25 | 4.3 ms | 9.8 ms | 51 | 1.3e-7 |
 
 Error is against an fp64 contact-rule reference at n_gl = 12 — neither of
 the rules being compared, because scoring supersampling against a
 supersampled reference flatters it. The middle row is the same arithmetic
-as the first, so its 2.8x / 3.6x is purely the cost of materialising the
+as the first, so its 2.9x / 3.8x is purely the cost of materialising the
 sub-exposure axis in MLX: every forward intermediate and every gradient
-grid is n_sub times the light curve.
+grid is n_sub times the light curve. The contact rule evaluates n_gl
+nodes per non-empty piece of the exposure: 5 for an exposure no contact
+falls inside, 25 only with all four inside.
 
 At matched accuracy the gap is not a factor of three. Supersampling
 converges as O(1/N) on a kinked curve, so 1e-6 needs n_sub ~ 2,271 —
@@ -134,8 +136,8 @@ where both routes stay resident:
 
 | matched to 1e-6 | forward | value+grad | peak MB |
 |---|---:|---:|---:|
-| expanded axis, n_sub=2271 | 59.0 ms | 176.5 ms | 1602 |
-| in-kernel contact, n_gl=5 | 1.9 ms (**30x**) | 3.1 ms (**57x**) | 10 (**161-517x**) |
+| expanded axis, n_sub=2271 | 36.7 ms | 120.7 ms | 1602 |
+| in-kernel contact, n_gl=5 | 0.51 ms (**72x**) | 0.78 ms (**155x**) | 10 (**161-517x**) |
 
 ## The batching rule for samplers
 

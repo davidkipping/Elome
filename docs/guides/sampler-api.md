@@ -54,9 +54,9 @@ separations, evaluating the kernel and averaging outside it:
 
 | | forward | value + gradient | peak memory |
 |---|---:|---:|---:|
-| sub-exposure axis expanded | 41.0 ms | 99.7 ms | 2,776 MB |
-| the same rule, in the kernel (`n_sub = 15`) | 14.5 ms | 28.0 ms | 51 MB |
-| contact rule, in the kernel (`n_gl = 5`) | 24.4 ms | 43.9 ms | 51 MB |
+| sub-exposure axis expanded | 19.6 ms | 59.0 ms | 2,776 MB |
+| the same rule, in the kernel (`n_sub = 15`) | 6.8 ms | 15.5 ms | 51 MB |
+| contact rule, in the kernel (`n_gl = 5`) | 4.3 ms | 9.8 ms | 51 MB |
 
 The last row is also about 1,200 times more accurate than the first
 ($1.3\times10^{-7}$ against $1.6\times10^{-4}$). Reaching $10^{-6}$ by
@@ -128,7 +128,7 @@ dev = flux_dev_from_tau(tau, period, a, b, r, u1, u2,
   (see {doc}`exposures`).
 
 The eccentric orbit costs a Kepler solve at each quadrature node: at
-512 × 5,000 under the contact rule, 1.7–2.3 times the circular cost
+512 × 5,000 under the contact rule, 2.3–3.3 times the circular cost
 (`benchmarks/bench_tau_ecc.py`). Chains at $e = 0$ skip the solve but
 still run in the larger kernel, so leave `secosw` and `sesinw` unset for
 a purely circular fit.
@@ -143,13 +143,14 @@ integration.
 ## Hybrid-law speed
 
 With the hybrid laws, the GPU kernels are faster than with the
-quadratic law, because no term needs an elliptic integral. At 512 × 5,000
+quadratic law, because no term needs an elliptic integral; only
+hybrid5's gradient, with three poles, costs more. At 512 × 5,000
 points under the contact rule (`benchmarks/bench_hybrid.py`):
 
 | law | forward | vs quadratic | value + gradient | vs quadratic |
 |---|---:|---:|---:|---:|
-| quadratic | 15.0 ms | 1.00× | 30.2 ms | 1.00× |
-| hybrid2 | 7.5 ms | 0.50× | 18.0 ms | 0.60× |
-| hybrid4 | 9.4 ms | 0.62× | 24.6 ms | 0.82× |
-| hybrid5 | 12.1 ms | 0.81× | 30.8 ms | 1.02× |
-| hybrid5, `ld_basis=True` | 14.1 ms | 0.94× | 31.7 ms | 1.05× |
+| quadratic | 4.4 ms | 1.00× | 9.8 ms | 1.00× |
+| hybrid2 | 2.4 ms | 0.55× | 6.0 ms | 0.62× |
+| hybrid4 | 3.2 ms | 0.74× | 8.7 ms | 0.89× |
+| hybrid5 | 3.9 ms | 0.90× | 11.4 ms | 1.16× |
+| hybrid5, `ld_basis=True` | 3.9 ms | 0.88× | 11.4 ms | 1.17× |

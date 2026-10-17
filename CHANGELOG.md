@@ -5,6 +5,16 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.18.2] — 2026-10-17
+
+### Changed
+- **Spherical planets, float32 on the GPU, contact rule: about 3x faster**
+  (512 x 5,000, quadratic: 15.0 ms -> 4.4 ms forward, 30.2 ms -> 9.8 ms
+  with gradients; the hybrid laws alike). As for oblate planets in
+  0.18.1, the kernels skip the quadrature nodes of zero weight; results
+  are bitwise unchanged. Benchmark tables in the docs and
+  `benchmarks/RESULTS.md` re-measured.
+
 ## [0.18.1] — 2026-10-17
 
 ### Fixed

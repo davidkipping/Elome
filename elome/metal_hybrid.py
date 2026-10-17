@@ -379,7 +379,8 @@ ORB_DECL
             for (int j = 0; j < ngl; ++j) {
                 float w = hw * wg[j];
                 float tt = mid + hw * xg[j];
-                ORB_Z(tt)
+                front = false;
+                if (w != 0.0f) { ORB_Z(tt) }
                 if (front) {
                     mp_hyb_cols(z, r, Bc);
                     for (int q = 0; q < HYB_NCOL; ++q) acc[q] += w * Bc[q];
