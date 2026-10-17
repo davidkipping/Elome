@@ -93,6 +93,30 @@ float32. The contact times for exposure integration are solved per
 side with a monotone Newton iteration on convex distance functions, and
 a separate kernel computes them.
 
+## Ringed planets
+
+A ring makes the occultor a region of piecewise-constant opacity: 1
+inside the planet, the ring's blocked fraction $T$ between its edges, 0
+elsewhere. Green's theorem then gives the occulted flux as a sum over
+every outline -- the planet's and the two ring edges' -- of its arcs on
+the star, each weighted by the jump in opacity across it, plus the limb
+arcs weighted by the opacity there. Each outline is walked once. Each
+arc is the same integral as an oblate planet's, so the even terms are
+Fourier sums and each pole term is a partial-fraction sum over the roots
+of a quartic. The arcs end where an outline crosses the limb (up to four
+times) or meets another outline. Because the outlines are concentric and
+coaxial, those corners have a closed form, and which side of another
+outline an arc lies on follows from it rather than from a point test,
+which would be fragile at a tangency. A circular outline (a spherical
+planet, a face-on ring) has a cubic for a quartic: its roots come from
+the quadratic formula, and a circle centred on the star uses a
+first-order expansion in its offset. Gradients come from the same
+frozen-endpoint scheme as for an oblate planet, with a corner term at
+every vertex weighted by the potential there. The float32 kernels
+evaluate each outline with its own dual numbers and chain the results to
+the ring parameters by hand. A separate kernel finds the moments each
+outline touches the limb, which are the exposure rule's split points.
+
 ## MLX caveats
 
 - `mx.sin`, `mx.cos`, `mx.exp` and `mx.erf` are only float32-accurate on

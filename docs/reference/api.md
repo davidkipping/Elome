@@ -155,7 +155,7 @@ Per-chain parameters in, per-chain light curves out, with analytic gradients. Se
 ### `flux_dev_from_tau`
 
 ```python
-flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *, exp_time: float = 0.0, integration: str = 'contact', n_gl: int = 5, n_sub: int = 1, ld_basis: bool = False, secosw=None, sesinw=None, limb_dark: str = 'quadratic', u=None, f=None, theta=None) -> mx.array
+flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *, exp_time: float = 0.0, integration: str = 'contact', n_gl: int = 5, n_sub: int = 1, ld_basis: bool = False, secosw=None, sesinw=None, limb_dark: str = 'quadratic', u=None, f=None, theta=None, ring_in=None, ring_out=None, ring_f=None, ring_tau=None) -> mx.array
 ```
 
 ```text
@@ -226,6 +226,16 @@ Args:
         (``metal_oblate``); fp64 the MLX graph on the CPU stream. In
         fp32, below f = 1e-5 a chain takes the spherical forms and
         d/df is 0 there (the flattening's effect is under 4e-8).
+    ring_in, ring_out, ring_f, ring_tau: a ring in the planet's
+        equatorial plane (``elome.rings``): inner and outer radii in
+        units of ``r``, projected flattening ring_f = 1 - |cos i| of the
+        ring, and normal optical depth (None or inf: opaque), scalars or
+        (n,). Hybrid laws only; the planet is spherical unless f is
+        given, and theta (defaulting to 0) orients the ring -- and the
+        oblate planet, which shares it. The contact rule splits each
+        exposure at the kinks inside it (``rings_tau``). fp32 data on
+        the GPU takes the ring Metal kernels (``metal_rings``); fp64
+        the MLX graph on the CPU stream.
     secosw, sesinw: (sqrt(e) cos w, sqrt(e) sin w), scalars or (n,).
         Omit both for a circular orbit (the default). Given, the orbit
         is the transit-anchored eccentric one (``anchored.py``), the
@@ -311,6 +321,23 @@ has their broadcast shape. Computed in float64 (on the CPU stream)
 unless every array argument is float32. A missing contact collapses
 onto a point inside the transit (the inner pair of a graze), or all
 four onto one point (no transit).
+```
+
+### `ring_kinks`
+
+```python
+ring_kinks(a, b, r, f, theta, ring_in, ring_out, ring_f, k=None, h=None)
+```
+
+```text
+The phases (offsets from mid-transit, phi = 2 pi (t - t0) / P) at
+which a ringed planet's light curve has a kink -- an outline tangent to
+the limb -- sorted, +inf in unused slots: shape (n, 24) for n parameter
+sets broadcast from the arguments (Python numbers, numpy or mx arrays).
+a: a/R*; b: impact parameter at conjunction; r, f, theta: the planet;
+ring_in, ring_out, ring_f: the ring; (k, h) = (secosw, sesinw) for an
+eccentric orbit. Float64 on the CPU stream unless every array argument
+is float32.
 ```
 
 ### `metal_available`
@@ -832,7 +859,7 @@ as plain Python floats.
 
 ## Light curves from separations (float64 reference graphs)
 
-Functions of the sky separation z (spherical) or the planet's centre in its principal frame (oblate). They follow MLX's broadcasting and type-promotion rules; see {doc}`../guides/gradients-and-precision`.
+Functions of the sky separation z (spherical) or the planet's centre in its principal frame (oblate, ringed). They follow MLX's broadcasting and type-promotion rules; see {doc}`../guides/gradients-and-precision`.
 
 ### `flux_dev`
 
@@ -932,6 +959,31 @@ trailing axis -- the spherical path's ``hybrid.shape_cols`` layout and
 N = hybrid_norms(law)). (x0, y0): centre in the principal frame
 (``principal_frame``); r: area-equivalent radius; f: flattening, with
 r <= (1 - f)^(3/2). y0, r and f arrays are cast to x0's dtype.
+```
+
+### `flux_dev_ring`
+
+```python
+flux_dev_ring(x0, y0, rp, f, ring_in, ring_out, ring_f, ring_tau, w, law) -> mx.array
+```
+
+```text
+F - 1 for a ringed planet and a hybrid law with shape weights w (a
+host sequence, (n_w,) or (..., n_w)); arguments as ``shape_cols_ring``.
+```
+
+### `shape_cols_ring`
+
+```python
+shape_cols_ring(x0, y0, rp, f, ring_in, ring_out, ring_f, ring_tau, law) -> mx.array
+```
+
+```text
+Shape-basis columns [E0, S_1..S_n] of a ringed planet, stacked on a
+trailing axis -- the ``ld_basis`` contract of the spherical and oblate
+paths (flux - 1 == (B @ c) / (N @ c), c = (1, -w),
+N = hybrid_norms(law)). Arguments as ``generator_cols_ring``; all are
+cast to x0's dtype.
 ```
 
 ### `oblate.principal_frame`

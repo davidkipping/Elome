@@ -75,6 +75,9 @@ __all__ = [
     "flux_dev_oblate",
     "shape_cols_oblate",
     "contact_offsets_oblate",
+    "flux_dev_ring",
+    "shape_cols_ring",
+    "ring_kinks",
     "HYBRID4",
     "HYBRID5",
     "HYBRID_LAWS",
@@ -94,4 +97,19 @@ __all__ = [
     "sn_dev_with_aux",
 ]
 
-__version__ = "0.17.2"
+__version__ = "0.18.0"
+
+# Ringed planets, exported lazily: the ring modules are imported only when
+# one of these is first used (or a ring parameter is set), so a spherical
+# or oblate model never loads them.
+_LAZY = {"flux_dev_ring": ("rings", "flux_dev_ring"),
+         "shape_cols_ring": ("rings", "shape_cols_ring"),
+         "ring_kinks": ("rings_tau", "ring_kinks")}
+
+
+def __getattr__(name):
+    if name in _LAZY:
+        import importlib
+        mod, attr = _LAZY[name]
+        return getattr(importlib.import_module(f".{mod}", __name__), attr)
+    raise AttributeError(f"module 'elome' has no attribute {name!r}")

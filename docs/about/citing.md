@@ -12,7 +12,7 @@ published. Until then, please cite the software by its repository,
 ## The hybrid limb-darkening laws
 
 If you use the hybrid laws (`hybrid2`, `hybrid4`, `hybrid5`), or model an
-oblate planet, please also cite:
+oblate or ringed planet, please also cite:
 
 - **The hybrid-law paper**, which introduces the laws and proves that they
   give elementary transit light curves for spherical and oblate planets

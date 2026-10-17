@@ -17,8 +17,9 @@ CPU. Both run through [MLX](https://github.com/ml-explore/mlx).
   parameter sets are batched.
 - **Differentiable.** Every parameter, including the limb darkening,
   the eccentricity and the planet's shape, has an analytic gradient.
-- **Spherical and oblate planets.** A flattened planet's light curve
-  stays elementary with the *hybrid* limb-darkening laws.
+- **Spherical, oblate and ringed planets.** A flattened planet's light
+  curve, and a ringed one's, stays elementary with the *hybrid*
+  limb-darkening laws.
 
 ```python
 import numpy as np
@@ -35,7 +36,7 @@ flux = elome.TransitModel(params, t).light_curve(params)
 
 ## Choose your path
 
-Most of what follows applies to every planet. The two paths differ in
+Most of what follows applies to every planet. The paths differ in
 their geometry, in the limb-darkening laws available, and in what to
 watch for when fitting.
 
@@ -58,6 +59,15 @@ companions larger than their star.
 A planet flattened by rotation projects to an ellipse. Two more
 parameters (flattening and sky angle), the hybrid limb-darkening laws,
 and the same fast, differentiable machinery.
+:::
+
+:::{grid-item-card} Ringed planets
+:link: rings/index
+:link-type: doc
+
+A spherical or oblate planet with a flat ring in its equatorial plane,
+opaque or translucent: four more parameters, exact limb darkening, every
+gradient.
 :::
 ::::
 
@@ -100,6 +110,16 @@ oblate/geometry
 oblate/light-curves
 oblate/accuracy-and-cost
 oblate/fitting
+```
+
+```{toctree}
+:hidden:
+:caption: Ringed planets
+
+rings/index
+rings/geometry
+rings/light-curves
+rings/accuracy-and-fitting
 ```
 
 ```{toctree}

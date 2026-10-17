@@ -5,6 +5,8 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-10-16
+
 ### Added
 - **Ringed planets** in `TransitModel` (`TransitParams.ring_in`,
   `ring_out`, `ring_f`, `ring_tau`, with `theta` orienting the ring and an
@@ -14,7 +16,7 @@ every release is tagged `vX.Y.Z` in git.
   ring field), the contact and supersample rules, eccentric orbits,
   `ld_basis`. The contact rule splits each exposure at the kinks inside
   it -- every outline's limb tangencies, found per parameter set
-  (`rings_tau.ring_kinks`) -- and matches converged supersampling to
+  (`elome.ring_kinks`) -- and matches converged supersampling to
   2e-9 on a nearly edge-on ring crossing the limb four times. Float32
   on the GPU runs fused Metal kernels (`metal_rings`, built on the oblate
   kernels' device functions, which are unchanged): forward, the VJP in
@@ -23,9 +25,10 @@ every release is tagged `vX.Y.Z` in git.
   and orbit, gradients <= 1e-6 of their scale. Float64 runs the MLX graph
   on the CPU, uncompiled (MLX 0.32's `mx.compile` fails on it). Oblate
   and spherical models never import or run any ring code.
-- `elome.rings`: the reference graph behind them. A flat circular ring in
-  the planet's equatorial plane, given
-  by projected parameters like an oblate planet: `ring_in`, `ring_out`
+- `elome.flux_dev_ring`, `elome.shape_cols_ring`: the reference graph
+  behind them, at sky positions (exported lazily: importing `elome`
+  loads none of the ring code). A flat circular ring in the planet's
+  equatorial plane, given by projected parameters like an oblate planet: `ring_in`, `ring_out`
   (radii in units of `rp`), `ring_f` (projected flattening,
   1 - |cos i|; uniform in it is the isotropic prior), the planet's
   `theta`, and `ring_tau` (normal optical depth; inf is opaque). Exact
@@ -38,6 +41,10 @@ every release is tagged `vX.Y.Z` in git.
   independent brute-force integrations: <= 5e-16 (float64) and <= 5e-8
   (float32) of each column's norm, including tangencies, a planet
   centred on the star and rings to |cos i| = 1e-10.
+
+### Documentation
+- A "Ringed planets" section: overview, geometry, light curves and
+  exposures, accuracy and fitting; the method in "How it works".
 
 ### Fixed
 - Oblate planets: an unused near-double-root slot in the pole integral
