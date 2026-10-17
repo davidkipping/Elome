@@ -52,7 +52,7 @@ What differs:
 - **The planet may be spherical or oblate.** Leave `f` unset for a
   spherical planet; set it for an oblate one, whose ring shares its
   `theta`.
-- **Cost.** A ringed planet costs a few times an oblate one: every
+- **Cost.** A ringed planet costs about 10–20 times an oblate one: every
   outline -- the planet and both ring edges -- is integrated. Spherical
   and oblate models never load or run any of the ring code.
 
@@ -62,8 +62,8 @@ What differs:
    symmetries and the domain.
 2. {doc}`light-curves`: computing ringed light curves from the frontend
    and the sampler API, and how exposures are integrated.
-3. {doc}`accuracy-and-fitting`: what to expect in each precision, and
-   what is specific to fitting a ring.
+3. {doc}`accuracy-and-fitting`: what to expect in each precision, what
+   it costs, and what is specific to fitting a ring.
 4. The shared guides: {doc}`../guides/exposures`,
    {doc}`../guides/batching`, {doc}`../guides/gradients-and-precision`,
    {doc}`../guides/sampler-api`.

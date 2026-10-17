@@ -45,14 +45,14 @@ transit (`benchmarks/bench_oblate.py`, M2 Max):
 | hybrid2, one evaluation per point | 9.9 ms | 15× | 31.5 ms | 22× |
 | hybrid4, one evaluation per point | 15.7 ms | 20× | 46.4 ms | 29× |
 | hybrid5, one evaluation per point | 20.0 ms | 22× | 62.3 ms | 32× |
-| hybrid2, contact rule (`n_gl = 5`) | 314 ms | 54× | 946 ms | 61× |
-| hybrid4, contact rule (`n_gl = 5`) | 494 ms | 60× | 1.45 s | 63× |
-| hybrid5, contact rule (`n_gl = 5`) | 631 ms | 61× | 1.94 s | 65× |
+| hybrid2, contact rule (`n_gl = 5`) | 108 ms | 19× | 323 ms | 21× |
+| hybrid4, contact rule (`n_gl = 5`) | 157 ms | 19× | 467 ms | 20× |
+| hybrid5, contact rule (`n_gl = 5`) | 205 ms | 20× | 621 ms | 21× |
 
-The contact-rule ratio is large because the spherical hybrid kernel is
-unusually cheap per quadrature node (about 0.1 ns, against 5–10 ns for
-the oblate one). In absolute terms, an oblate light curve of a few
-thousand points takes milliseconds.
+Under the contact rule, an exposure that no contact falls inside costs
+`n_gl` evaluations; one containing a contact costs `n_gl` more per
+contact. In absolute terms, an oblate light curve of a few thousand
+points takes milliseconds.
 
 ## Against other oblate-planet codes
 

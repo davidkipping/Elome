@@ -1164,7 +1164,10 @@ _OB_FWD = _OB_HEAD + "W_LOADS" + """
             tt = 0.5f * (lo + hi) + hw * xg[j];
             w = hw * wg[j];
         }
-        ORB_XY(tt)
+        // a node of zero weight (an empty sub-interval of the contact
+        // split) adds exactly nothing: skip its evaluation
+        front = false;
+        if (w != 0.0f) { ORB_XY(tt) }
         if (front) {
             EVAL
             for (int q = 0; q < NACC; ++q) acc[q] += w * val[q];
@@ -1214,7 +1217,8 @@ _OB_VJP = _OB_HEAD + "W_LOADS" + "CT_LOAD" + """
             w = hw * wg[j];
             dw = dhw * wg[j];
         }
-        ORB_XYD(tt)
+        front = false;
+        if (w != 0.0f || dw != 0.0f) { ORB_XYD(tt) }
         float f = 0.0f, dfdtt = 0.0f;
         if (front) {
             EVAL_D

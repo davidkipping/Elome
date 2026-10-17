@@ -619,6 +619,7 @@ _RG_EDGES = """
     float edge[6]; float dedge[6];
     edge[0] = t1;  dedge[0] = 1.0f;
     edge[5] = t2;  dedge[5] = 1.0f;
+    int n_iv = 1;
     {
         int ne = 0;
         for (int c = 0; c < NKINK; ++c) {
@@ -626,12 +627,40 @@ _RG_EDGES = """
             if (kt > t1 && kt < t2 && ne < 4) { edge[1 + ne] = kt; dedge[1 + ne] = 0.0f; ++ne; }
         }
         for (int c = ne; c < 4; ++c) { edge[1 + c] = t2; dedge[1 + c] = 1.0f; }
+        n_iv = 1 + ne;
     }
+    int n_act = (mode == MODE_NONE || mode == MODE_SUPER) ? n_node : n_iv * ngl;
+    int chunk = (n_act + npart - 1) / npart;
+    int n_lo = (int)part * chunk, n_hi = metal::min(n_act, n_lo + chunk);
+"""
+
+
+# One exposure's quadrature nodes are shared out over `npart` threads (x =
+# part * npts + point; the parts are summed outside). Only the nodes of the
+# n_iv non-empty sub-intervals are dealt out -- the contact split leaves the
+# rest empty unless four kinks fall in the exposure -- so a typical exposure
+# costs each thread n_gl / npart evaluations. A ringed evaluation costs ~10x
+# an oblate one (~30x with its gradient), and a thread that ran all
+# 5 * n_gl of them held the GPU long enough for macOS to abort the command
+# buffer ("Impacting Interactivity") whenever the display needed it. S, the
+# total weight, is still summed over every node, so each part's A / S is
+# its exact share.
+_RG_SPLIT = """    uint xv = thread_position_in_grid.x;
+    uint y = thread_position_in_grid.y;
+    uint part = xv / (uint)npts;
+    uint x = xv - part * (uint)npts;
+    if (part >= (uint)npart) return;
+    uint i = y * (uint)npts + x;
+    uint iv = (y * (uint)npart + part) * (uint)npts + x;
 """
 
 
 def _ring_head():
-    return _rep(MO._OB_HEAD, "    float th  = thin[y];\n",
+    s = _rep(MO._OB_HEAD, "    uint x = thread_position_in_grid.x;\n"
+             "    uint y = thread_position_in_grid.y;\n"
+             "    if (x >= (uint)npts) return;\n"
+             "    uint i = y * (uint)npts + x;\n", _RG_SPLIT)
+    return _rep(s, "    float th  = thin[y];\n",
                 "    float th  = thin[y];\n" + _RG_LOADS)
 
 
@@ -642,8 +671,19 @@ def _ring_body(body):
 
 
 _RG_FWD = _ring_body(MO._OB_FWD)
+_RG_FWD = _rep(_RG_FWD, "        if (w != 0.0f) { ORB_XY(tt) }\n",
+               "        if (node >= n_lo && node < n_hi && w != 0.0f) { ORB_XY(tt) }\n")
+_RG_FWD = _rep(_RG_FWD, "out[(uint)NACC * i + (uint)q]", "out[(uint)NACC * iv + (uint)q]")
 
 _RG_VJP = _ring_body(MO._OB_VJP)
+_RG_VJP = _rep(_RG_VJP, "        if (w != 0.0f || dw != 0.0f) { ORB_XYD(tt) }\n",
+               "        if (node >= n_lo && node < n_hi && (w != 0.0f || dw != 0.0f)) "
+               "{ ORB_XYD(tt) }\n")
+_RG_VJP = _rep(_RG_VJP, "    gtau[i] = g_tau;\n", "    gtau[iv] = g_tau;\n")
+_RG_VJP = _rep(_RG_VJP, "        uint ngrp = ((uint)npts + 31u) / 32u;\n"
+               "        uint ob = y * NSLOT_C * ngrp + x / 32u;\n",
+               "        uint ngrp = ((uint)npart * (uint)npts + 31u) / 32u;\n"
+               "        uint ob = y * NSLOT_C * ngrp + xv / 32u;\n")
 _RG_VJP = _rep(_RG_VJP, "    float g[5];\n", "    float g[9];\n")
 _RG_VJP = _rep(_RG_VJP, "    float a_per = 0.0f, a_r = 0.0f, a_f = 0.0f, a_ts = 0.0f;\n",
                "    float a_per = 0.0f, a_r = 0.0f, a_f = 0.0f, a_ts = 0.0f;\n"
@@ -734,7 +774,8 @@ def _get_kernels(law, orbit: str, basis: bool):
         ins = (["taui", "perin", "ain"] + MO._OB_ORBITS[orbit]["inputs"]
                + ["rin", "fin", "thin", "riin", "roin", "crin", "Tin"]
                + ([] if basis else ["win"])
-               + ["ks", "xg", "wg", "expt", "mode", "ngl", "nsub", "npts"])
+               + ["ks", "xg", "wg", "expt", "mode", "ngl", "nsub", "npart",
+                  "npts"])
         tag = f"{_law_tag(law)}_{orbit}{'_b' if basis else ''}"
         M._kernels[key] = (
             mx.fast.metal_kernel(
@@ -761,32 +802,50 @@ def _make_core(law, exp_time, mode, n_gl, n_sub, orbit, basis):
     nth = MO._OB_ORBITS[orbit]["nth"]
     nslot = _nslot(law, orbit, basis)
     ncol = law.n_col
+    # threads per exposure (see _RG_SPLIT). Forward: one node each for the
+    # n_gl nodes of an exposure with no kink inside, up to 8. The VJP, ~4x
+    # dearer an evaluation, one node each for up to 25.
+    npart_f = {M._INT_CONTACT: min(max(5, int(n_gl)), 8),
+               M._INT_SUPER: max(1, min(8, int(n_sub)))}.get(int(mode), 1)
+    npart_b = {M._INT_CONTACT: min(5 * int(n_gl), 25),
+               M._INT_SUPER: max(1, min(25, int(n_sub)))}.get(int(mode), 1)
 
     def _static(dtype):
         return mx.array(xg_np, dtype=dtype), mx.array(wg_np, dtype=dtype)
+
+    def _parts(v, n, m, npart):
+        if npart == 1:
+            return v
+        return mx.sum(v.reshape(n, npart, m, *v.shape[2:]), axis=1)
 
     def _fwd(*primals):
         tau2d = primals[0]
         n, m = tau2d.shape
         xg, wg = _static(tau2d.dtype)
         k = _get_kernels(law, orbit, basis)[0]
-        return k(inputs=[*primals, xg, wg, exp_time, mode, n_gl, n_sub, int(m)],
-                 output_shapes=[(n, m, ncol) if basis else (n, m)],
-                 output_dtypes=[mx.float32],
-                 grid=(m, n, 1), threadgroup=(256, 1, 1))[0]
+        npart = npart_f
+        out = k(inputs=[*primals, xg, wg, exp_time, mode, n_gl, n_sub, npart,
+                        int(m)],
+                output_shapes=[(n, npart * m, ncol) if basis else (n, npart * m)],
+                output_dtypes=[mx.float32],
+                grid=(npart * m, n, 1), threadgroup=(256, 1, 1))[0]
+        return _parts(out, n, m, npart)
 
     def _vjp(primals, cotangent, output):
         ct = cotangent if isinstance(cotangent, mx.array) else cotangent[0]
         tau2d = primals[0]
         n, m = tau2d.shape
-        cols = (m + 31) // 32
         xg, wg = _static(tau2d.dtype)
         k = _get_kernels(law, orbit, basis)[1]
+        npart = npart_b
+        cols = (npart * m + 31) // 32
         gtau, gpar = k(
-            inputs=[*primals, xg, wg, exp_time, mode, n_gl, n_sub, ct, int(m)],
-            output_shapes=[(n, m), (n, nslot, cols)],
+            inputs=[*primals, xg, wg, exp_time, mode, n_gl, n_sub, npart, ct,
+                    int(m)],
+            output_shapes=[(n, npart * m), (n, nslot, cols)],
             output_dtypes=[mx.float32] * 2, init_value=0.0,
-            grid=(m, n, 1), threadgroup=(256, 1, 1))
+            grid=(npart * m, n, 1), threadgroup=(256, 1, 1))
+        gtau = _parts(gtau, n, m, npart)
         g = mx.sum(gpar, axis=2)
         g_per, g_a = g[:, 0], g[:, 1]
         if orbit == "circ":

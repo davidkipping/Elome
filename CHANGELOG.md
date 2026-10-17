@@ -5,6 +5,31 @@ every release is tagged `vX.Y.Z` in git.
 
 ## [Unreleased]
 
+## [0.18.1] — 2026-10-17
+
+### Fixed
+- **Ringed planets, float32 on the GPU, with an exposure rule:** the
+  ring kernels evaluated every quadrature node of an exposure in one GPU
+  thread (25 ring evaluations under the contact rule), long enough that
+  macOS aborted the command buffer ("Impacting Interactivity") whenever
+  the display needed the GPU -- at any batch size, often surfacing only
+  at the next evaluation, after a call that returned incomplete flux.
+  Each exposure's nodes are now shared out over several threads (up to 8
+  forward, 25 for gradients), skipping the empty sub-intervals the contact
+  split leaves, and summed. Results agree with the float64 graph as
+  before; spherical and oblate kernels are unchanged.
+
+### Changed
+- **Oblate planets, float32 on the GPU, contact rule: about 3x faster**
+  (hybrid5, 512 x 5,000: 636 ms -> 205 ms forward, 1.95 s -> 621 ms with
+  gradients). The kernels skip the quadrature nodes of zero weight -- the
+  empty sub-intervals of the contact split -- which added exactly nothing;
+  results are bitwise unchanged.
+
+### Added
+- `benchmarks/bench_rings.py`: ringed against spherical and oblate cost;
+  the costs are in the docs (Ringed planets: accuracy, cost and fitting).
+
 ## [0.18.0] — 2026-10-16
 
 ### Added

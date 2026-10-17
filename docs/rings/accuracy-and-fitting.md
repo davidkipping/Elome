@@ -1,4 +1,4 @@
-# Accuracy and fitting
+# Accuracy, cost and fitting
 
 ## Accuracy
 
@@ -33,6 +33,27 @@ weight.
 As for an oblate planet, a flattening below $10^{-5}$ is evaluated as a
 circle in float32 -- here also `ring_f` below $10^{-5}$, a face-on ring
 -- and the derivative with respect to it is 0 in that band.
+
+## Cost
+
+Every outline -- the planet and both ring edges -- is integrated, and
+each splits into arcs where it crosses the others, so a ringed planet
+costs about 10–20 times an oblate one. Fused float32 kernels, 512 chains
+× 5,000 points around a transit, a spherical planet with a ring
+(`benchmarks/bench_rings.py`, M2 Max):
+
+| | forward | vs oblate | value + gradient | vs oblate |
+|---|---:|---:|---:|---:|
+| hybrid2, one evaluation per point | 108 ms | 11× | 420 ms | 13× |
+| hybrid4, one evaluation per point | 175 ms | 11× | 707 ms | 15× |
+| hybrid5, one evaluation per point | 229 ms | 11× | 980 ms | 16× |
+| hybrid2, contact rule (`n_gl = 5`) | 1.59 s | 15× | 5.57 s | 17× |
+| hybrid4, contact rule (`n_gl = 5`) | 2.52 s | 16× | 9.05 s | 19× |
+| hybrid5, contact rule (`n_gl = 5`) | 3.27 s | 16× | 12.2 s | 20× |
+
+An oblate planet with the same ring costs 10–20% more. The gradients
+are in every input, the ring's included; the contact-rule times include
+finding each chain's kinks.
 
 ## Fitting a ringed planet
 
