@@ -6,9 +6,20 @@ every release is tagged `vX.Y.Z` in git.
 ## [Unreleased]
 
 ### Added
-- `elome.rings`: transits of ringed planets, the float64 reference graph
-  and its float32 twin (not yet wired into `TransitModel` or the GPU
-  kernels). A flat circular ring in the planet's equatorial plane, given
+- **Ringed planets** in `TransitModel` (`TransitParams.ring_in`,
+  `ring_out`, `ring_f`, `ring_tau`, with `theta` orienting the ring and an
+  oblate planet alike) and `flux_dev_from_tau(ring_in=, ring_out=,
+  ring_f=, ring_tau=)`, on every surface: `light_curve`, `light_curves`
+  (sequence and array-valued), `light_curve_mx` (differentiable in every
+  ring field), the contact and supersample rules, eccentric orbits,
+  `ld_basis`. The contact rule splits each exposure at the kinks inside
+  it -- every outline's limb tangencies, found per parameter set
+  (`rings_tau.ring_kinks`) -- and matches converged supersampling to
+  2e-9 on a nearly edge-on ring crossing the limb four times. The MLX
+  graph in either precision, uncompiled (MLX 0.32's `mx.compile` fails
+  on it); no GPU kernel yet.
+- `elome.rings`: the reference graph behind them. A flat circular ring in
+  the planet's equatorial plane, given
   by projected parameters like an oblate planet: `ring_in`, `ring_out`
   (radii in units of `rp`), `ring_f` (projected flattening,
   1 - |cos i|; uniform in it is the isotropic prior), the planet's

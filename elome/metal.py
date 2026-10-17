@@ -1606,7 +1606,8 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
                       n_gl: int = 5, n_sub: int = 1,
                       ld_basis: bool = False, secosw=None,
                       sesinw=None, limb_dark: str = "quadratic",
-                      u=None, f=None, theta=None) -> mx.array:
+                      u=None, f=None, theta=None, ring_in=None,
+                      ring_out=None, ring_f=None, ring_tau=None) -> mx.array:
     """F - 1 from time-since-mid-transit, with the exposure integrated
     *inside* the kernel.
 
@@ -1674,6 +1675,15 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
             (``metal_oblate``); fp64 the MLX graph on the CPU stream. In
             fp32, below f = 1e-5 a chain takes the spherical forms and
             d/df is 0 there (the flattening's effect is under 4e-8).
+        ring_in, ring_out, ring_f, ring_tau: a ring in the planet's
+            equatorial plane (``elome.rings``): inner and outer radii in
+            units of ``r``, projected flattening ring_f = 1 - |cos i| of the
+            ring, and normal optical depth (None or inf: opaque), scalars or
+            (n,). Hybrid laws only; the planet is spherical unless f is
+            given, and theta (defaulting to 0) orients the ring -- and the
+            oblate planet, which shares it. The contact rule splits each
+            exposure at the kinks inside it (``rings_tau``). The MLX graph
+            in the data's dtype; there is no ring GPU kernel yet.
         secosw, sesinw: (sqrt(e) cos w, sqrt(e) sin w), scalars or (n,).
             Omit both for a circular orbit (the default). Given, the orbit
             is the transit-anchored eccentric one (``anchored.py``), the
@@ -1720,7 +1730,16 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
         mode = _INT_NONE
     if (secosw is None) != (sesinw is None):
         raise ValueError("pass both secosw and sesinw, or neither")
-    if theta is not None and f is None:
+    ringed = ring_in is not None
+    if not ringed and any(v is not None for v in (ring_out, ring_f, ring_tau)):
+        raise ValueError("ring_out=, ring_f=, ring_tau= describe a ring; pass "
+                         "ring_in= too")
+    if ringed and (ring_out is None or ring_f is None):
+        raise ValueError("a ring needs ring_in=, ring_out= and ring_f=")
+    if ringed and limb_dark == "quadratic":
+        raise ValueError("ringed planets take a hybrid law: "
+                         "limb_dark='hybrid2' | 'hybrid4' | 'hybrid5'")
+    if theta is not None and f is None and not ringed:
         raise ValueError("theta= is an oblate planet's; pass f= too")
     if f is not None and limb_dark == "quadratic":
         raise ValueError("oblate planets (f=) take a hybrid law: "
@@ -1734,6 +1753,14 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
         if u is None and not ld_basis:
             raise ValueError(f"{limb_dark} needs its weights as u= unless "
                              "ld_basis=True")
+        if ringed:
+            from .rings_tau import flux_dev_from_tau_ring
+            return flux_dev_from_tau_ring(
+                tau, period, a, b, r, 0.0 if f is None else f,
+                0.0 if theta is None else theta, ring_in, ring_out, ring_f,
+                math.inf if ring_tau is None else ring_tau, limb_dark, u,
+                float(exp_time), mode, int(n_gl), int(n_sub), bool(ld_basis),
+                secosw, sesinw)
         if f is not None:
             from .oblate_tau import flux_dev_from_tau_oblate
             return flux_dev_from_tau_oblate(

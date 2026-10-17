@@ -77,13 +77,35 @@ def _is_vector_law(law) -> bool:
     return law == "polynomial" or _hybrid_law(law) is not None
 
 
+_RING_FIELDS = ("ring_in", "ring_out", "ring_f", "ring_tau")
+
+
+def _is_ringed(params) -> bool:
+    """params.ring_in given = a ringed planet; the other ring fields
+    without it are an error."""
+    ringed = getattr(params, "ring_in", None) is not None
+    if not ringed and any(getattr(params, k, None) is not None
+                          for k in _RING_FIELDS[1:]):
+        raise ValueError("params.ring_out / ring_f / ring_tau describe a ring; "
+                         "set params.ring_in too (or leave them all None)")
+    return ringed
+
+
+# a batched field left None: its value (fp, theta, a ringed planet's f: 0;
+# ring_tau: an opaque ring)
+_BATCH_DEFAULTS = {"ring_tau": math.inf}
+
+
 def _is_oblate(params) -> bool:
-    """params.f given = an oblate planet. theta alone is an error (it is an
-    oblate planet's); a TransitParams without the attributes has neither."""
+    """params.f given = an oblate planet. theta alone is an error unless
+    the planet has a ring (theta is the oblate planet's or the ring's sky
+    angle); a TransitParams without the attributes has neither."""
     obl = getattr(params, "f", None) is not None
-    if not obl and getattr(params, "theta", None) is not None:
-        raise ValueError("params.theta is an oblate planet's; set "
-                         "params.f too (or leave both None)")
+    if (not obl and getattr(params, "theta", None) is not None
+            and not _is_ringed(params)):
+        raise ValueError("params.theta is an oblate planet's or a ring's; "
+                         "set params.f too, or params.ring_in (or leave theta "
+                         "None)")
     return obl
 
 
@@ -109,6 +131,15 @@ class TransitParams:
         # direction of motion at transit [degrees]. None = spherical.
         self.f = None
         self.theta = None
+        # a ring in the planet's equatorial plane (hybrid laws only;
+        # elome.rings): inner and outer radii in units of rp, the ring's
+        # projected flattening 1 - |cos i_ring|, and its normal optical
+        # depth (None: opaque). theta orients it (and an oblate planet,
+        # which shares it). None = no ring.
+        self.ring_in = None
+        self.ring_out = None
+        self.ring_f = None
+        self.ring_tau = None
 
 
 def _u_vector(u, sets=False):
@@ -367,9 +398,18 @@ class TransitModel:
         self.transittype = transittype
         # oblate planet: fixed per model, like the law (its own graphs)
         self._oblate = _is_oblate(params)
-        self._batch_keys = self._BATCH_KEYS + (("f", "theta") if self._oblate
-                                               else ())
-        if self._oblate:
+        self._ringed = _is_ringed(params)
+        self._batch_keys = self._BATCH_KEYS + (
+            ("f", "theta") + _RING_FIELDS if self._ringed
+            else ("f", "theta") if self._oblate else ())
+        if self._ringed:
+            if _hybrid_law(params.limb_dark) is None:
+                raise ValueError("a ringed planet (params.ring_in) takes a "
+                                 "hybrid law: limb_dark='hybrid2' | "
+                                 "'hybrid4' | 'hybrid5'")
+            if transittype != "primary":
+                raise ValueError("a ringed planet is primary-transit only")
+        elif self._oblate:
             if _hybrid_law(params.limb_dark) is None:
                 raise ValueError("an oblate planet (params.f) takes a hybrid "
                                  "law: limb_dark='hybrid2' | 'hybrid4' | "
@@ -443,6 +483,8 @@ class TransitModel:
             names.append("fp")
         if self._oblate:
             names.append("f")
+        if self._ringed:
+            names += ["ring_in", "ring_out", "ring_f"]
         return names
 
     # -- internals ---------------------------------------------------------
@@ -751,6 +793,8 @@ class TransitModel:
             return cast(math.radians(float(x)))   # on the host, in fp64
 
         self._require(lambda k: getattr(params, k), self._required_fields())
+        if self._ringed:
+            return self._ring_eval(params, uv, cast, rad, is_arr)
         if self._oblate:
             return self._oblate_eval(params, uv, cast, rad, is_arr)
 
@@ -924,11 +968,82 @@ class TransitModel:
             out = self._oblate_fn("kh")(*head, b, rp, f, th, cast(uv), k, h)
         return self._apply_masks(out, emask, gmask)
 
+    # -- ringed planets -------------------------------------------------------
+    #
+    # The oblate route's structure, with rings_tau's graph: time since each
+    # point's own mid-transit, then metal.flux_dev_from_tau(ring_in=, ...).
+    # There is no ring GPU kernel yet, so every dtype runs the graph, and
+    # uncompiled: MLX 0.32's mx.compile fails on it (an internal
+    # "unordered_map::at" error once two outlines' arc weights are in one
+    # graph; the eager graph is exact).
+
+    def _ring_fn(self, orbit: str):
+        """The compiled ringed-planet model; ``orbit`` as _oblate_fn's."""
+        key = ("ring", orbit)
+        fn = self._compiled.get(key)
+        if fn is not None:
+            return fn
+        from .metal import _INT_CONTACT, _INT_NONE
+        from .rings_tau import flux_dev_from_tau_ring
+        contact = self.integration == "contact"
+        mode = _INT_CONTACT if contact else _INT_NONE
+        exp_time = self.exp_time if contact else 0.0
+        law, n_gl = self._hlaw, self.n_gl
+
+        def flux(tt, t0, per, a, b, rp, f, th, ri, ro, rf, rt, uv, k=None, h=None):
+            tau = tt - t0
+            tau = tau - per * mx.round(tau / per)
+            return 1.0 + flux_dev_from_tau_ring(
+                tau, per, a, b, rp, f, th, ri, ro, rf, rt, law, uv, exp_time,
+                mode, n_gl, 1, k=k, h=h, ew=orbit == "ew")
+        if orbit == "circ":
+            def raw(tt, t0, per, a, b, rp, f, th, ri, ro, rf, rt, uv):
+                return flux(tt, t0, per, a, b, rp, f, th, ri, ro, rf, rt, uv)
+        else:
+            def raw(tt, t0, per, a, b, rp, f, th, ri, ro, rf, rt, uv, k, h):
+                return flux(tt, t0, per, a, b, rp, f, th, ri, ro, rf, rt, uv, k, h)
+        self._compiled[key] = raw
+        return raw
+
+    def _ring_eval(self, params, uv, cast, rad, is_arr):
+        """light_curve / light_curve_mx for a ringed model, as _oblate_eval."""
+        from .rings import _check_ring
+        f = 0.0 if params.f is None else params.f
+        tau = math.inf if params.ring_tau is None else params.ring_tau
+        _check_ring(f, params.ring_in, params.ring_out, params.ring_f, tau)
+        t0_off, per, a, rp, ci, ci_py, gmask = self._prep(params, cast, rad,
+                                                          is_arr)
+        ring = (cast(f), rad(0.0 if params.theta is None else params.theta),
+                cast(params.ring_in), cast(params.ring_out),
+                cast(params.ring_f), cast(tau))
+        head = (self._t_mx, t0_off, per, a)
+        route = self._ecc_route(params, cast, rad, is_arr)
+        if route[0] == "ew":
+            _, e, wr, emask = route
+            b = contact_geometry(a, e, e * sincos(wr)[0], ci)[1]
+            out = self._ring_fn("ew")(*head, b, rp, *ring, cast(uv), e, wr)
+        elif route[0] == "circ":
+            emask = None
+            b = (a * ci if is_arr(params.a) or is_arr(params.inc)
+                 else cast(float(params.a) * ci_py))
+            out = self._ring_fn("circ")(*head, b, rp, *ring, cast(uv))
+        else:
+            _, k, h, ev, sq = route
+            emask = None
+            b = contact_geometry(a, cast(ev), h * sq, ci)[1]
+            out = self._ring_fn("kh")(*head, b, rp, *ring, cast(uv), k, h)
+        return self._apply_masks(out, emask, gmask)
+
     def _check_shape_kind(self, params):
-        """Oblate or spherical is fixed per model (separate graphs)."""
+        """Oblate or spherical, ringed or not, is fixed per model (separate
+        graphs)."""
         if _is_oblate(params) != self._oblate:
             raise ValueError("params.f changed between None and a value since "
                              "model construction; build a new TransitModel")
+        if _is_ringed(params) != self._ringed:
+            raise ValueError("params.ring_in changed between None and a value "
+                             "since model construction; build a new "
+                             "TransitModel")
 
     # -- batman-compatible surface ----------------------------------------
 
@@ -994,8 +1109,9 @@ class TransitModel:
             for k in self._batch_keys:
                 vals = [getattr(p, k) for p in seq]
                 # only optional fields are None here: fp of a primary
-                # transit, theta of an oblate planet
-                cols[k] = np.array([0.0 if v is None else float(v)
+                # transit, theta, f of a ringed planet, ring_tau (opaque)
+                dflt = _BATCH_DEFAULTS.get(k, 0.0)
+                cols[k] = np.array([dflt if v is None else float(v)
                                     for v in vals], dtype=np.float64)
             rows = []
             for p in seq:
@@ -1032,7 +1148,7 @@ class TransitModel:
         cols = {}
         for k in self._batch_keys:
             v = getattr(p, k)
-            v = 0.0 if v is None else v
+            v = _BATCH_DEFAULTS.get(k, 0.0) if v is None else v
             cols[k] = np.broadcast_to(
                 np.atleast_1d(np.asarray(v, dtype=np.float64)),
                 (n,)).astype(np.float64)
@@ -1090,7 +1206,22 @@ class TransitModel:
                 u1, u2 = _ld_coeffs_batch(self.limb_dark, u_np)
                 u1, u2 = col(u1), col(u2)
 
-            if self._oblate:
+            if self._ringed:
+                from .rings import _check_ring
+                _check_ring(cols["f"], cols["ring_in"], cols["ring_out"],
+                            cols["ring_f"], cols["ring_tau"])
+                b_np = contact_geometry(
+                    cols["a"], ecc, ecc * np.sin(w), np.cos(inc),
+                    sqrt=np.sqrt, maximum=np.maximum)[1]
+                args = (self._t_mx[None, :], t0, per, a, col(b_np), rp,
+                        col(cols["f"]), col(np.radians(cols["theta"])),
+                        col(cols["ring_in"]), col(cols["ring_out"]),
+                        col(cols["ring_f"]), col(cols["ring_tau"]), uvec)
+                if bool(np.any(ecc > 0.0)):
+                    out = self._ring_fn("kh")(*args, k, h)
+                else:
+                    out = self._ring_fn("circ")(*args)
+            elif self._oblate:
                 from .oblate import _check_domain
                 _check_domain(cols["rp"], cols["f"])
                 b_np = contact_geometry(
