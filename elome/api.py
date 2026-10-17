@@ -972,10 +972,10 @@ class TransitModel:
     #
     # The oblate route's structure, with rings_tau's graph: time since each
     # point's own mid-transit, then metal.flux_dev_from_tau(ring_in=, ...).
-    # There is no ring GPU kernel yet, so every dtype runs the graph, and
-    # uncompiled: MLX 0.32's mx.compile fails on it (an internal
-    # "unordered_map::at" error once two outlines' arc weights are in one
-    # graph; the eager graph is exact).
+    # An fp32 GPU model takes the ring Metal kernels (metal_rings); fp64 and
+    # use_metal=False the graph -- uncompiled: MLX 0.32's mx.compile fails
+    # on it (an internal "unordered_map::at" error once two outlines' arc
+    # weights are in one graph; the eager graph is exact).
 
     def _ring_fn(self, orbit: str):
         """The compiled ringed-planet model; ``orbit`` as _oblate_fn's."""
@@ -988,14 +988,14 @@ class TransitModel:
         contact = self.integration == "contact"
         mode = _INT_CONTACT if contact else _INT_NONE
         exp_time = self.exp_time if contact else 0.0
-        law, n_gl = self._hlaw, self.n_gl
+        law, n_gl, use_metal = self._hlaw, self.n_gl, self.use_metal
 
         def flux(tt, t0, per, a, b, rp, f, th, ri, ro, rf, rt, uv, k=None, h=None):
             tau = tt - t0
             tau = tau - per * mx.round(tau / per)
             return 1.0 + flux_dev_from_tau_ring(
                 tau, per, a, b, rp, f, th, ri, ro, rf, rt, law, uv, exp_time,
-                mode, n_gl, 1, k=k, h=h, ew=orbit == "ew")
+                mode, n_gl, 1, k=k, h=h, ew=orbit == "ew", use_metal=use_metal)
         if orbit == "circ":
             def raw(tt, t0, per, a, b, rp, f, th, ri, ro, rf, rt, uv):
                 return flux(tt, t0, per, a, b, rp, f, th, ri, ro, rf, rt, uv)

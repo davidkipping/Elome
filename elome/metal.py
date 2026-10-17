@@ -1682,8 +1682,9 @@ def flux_dev_from_tau(tau: mx.array, period, a, b, r, u1=None, u2=None, *,
             (n,). Hybrid laws only; the planet is spherical unless f is
             given, and theta (defaulting to 0) orients the ring -- and the
             oblate planet, which shares it. The contact rule splits each
-            exposure at the kinks inside it (``rings_tau``). The MLX graph
-            in the data's dtype; there is no ring GPU kernel yet.
+            exposure at the kinks inside it (``rings_tau``). fp32 data on
+            the GPU takes the ring Metal kernels (``metal_rings``); fp64
+            the MLX graph on the CPU stream.
         secosw, sesinw: (sqrt(e) cos w, sqrt(e) sin w), scalars or (n,).
             Omit both for a circular orbit (the default). Given, the orbit
             is the transit-anchored eccentric one (``anchored.py``), the

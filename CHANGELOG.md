@@ -15,9 +15,14 @@ every release is tagged `vX.Y.Z` in git.
   `ld_basis`. The contact rule splits each exposure at the kinks inside
   it -- every outline's limb tangencies, found per parameter set
   (`rings_tau.ring_kinks`) -- and matches converged supersampling to
-  2e-9 on a nearly edge-on ring crossing the limb four times. The MLX
-  graph in either precision, uncompiled (MLX 0.32's `mx.compile` fails
-  on it); no GPU kernel yet.
+  2e-9 on a nearly edge-on ring crossing the limb four times. Float32
+  on the GPU runs fused Metal kernels (`metal_rings`, built on the oblate
+  kernels' device functions, which are unchanged): forward, the VJP in
+  every parameter, `ld_basis`, and a one-thread-per-chain kink solver.
+  Against the float64 graph: light curves <= 1e-7 on every exposure rule
+  and orbit, gradients <= 1e-6 of their scale. Float64 runs the MLX graph
+  on the CPU, uncompiled (MLX 0.32's `mx.compile` fails on it). Oblate
+  and spherical models never import or run any ring code.
 - `elome.rings`: the reference graph behind them. A flat circular ring in
   the planet's equatorial plane, given
   by projected parameters like an oblate planet: `ring_in`, `ring_out`

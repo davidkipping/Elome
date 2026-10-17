@@ -4,8 +4,8 @@
 ring parameters delegate here. The light curve is ``rings.shape_cols_ring``
 at the planet's sky position in its principal frame (sky frame and theta
 convention: ``oblate_tau``), integrated over each exposure. This is the
-graph (fp64 on the CPU stream, or fp32 wherever the data lives); the
-float32 GPU kernels are not written yet.
+graph (fp64 on the CPU stream), or for fp32 data on the GPU the fused
+kernels of ``metal_rings``.
 
 **Kinks.** The light curve is smooth except where an outline -- the planet
 or a ring edge -- is tangent to the stellar limb, i.e. where its number of
@@ -261,10 +261,13 @@ def _tau_graph(tau, period, a, b, r, f, theta, ring_in, ring_out, ring_f,
 @fp64_on_cpu
 def flux_dev_from_tau_ring(tau, period, a, b, r, f, theta, ring_in, ring_out,
                            ring_f, ring_tau, law, u, exp_time, mode, n_gl,
-                           n_sub, basis=False, k=None, h=None, ew=False):
+                           n_sub, basis=False, k=None, h=None, ew=False,
+                           use_metal=True):
     """``metal.flux_dev_from_tau`` with ``ring_in=`` (that function validates
-    the keywords and delegates here): the graph, in the data's dtype. ``ew``:
-    (k, h) hold (e, w [rad]) -- TransitModel's array-ecc route."""
+    the keywords and delegates here). fp32 data on the GPU stream takes the
+    ring Metal kernels (``metal_rings``) unless ``use_metal`` is False;
+    anything else runs this graph, fp64 on the CPU stream. ``ew``: (k, h)
+    hold (e, w [rad]) -- TransitModel's array-ecc route."""
     from .metal_hybrid import _canon_w
     law = get_law(law)
     if tau.ndim not in (1, 2):
@@ -286,8 +289,15 @@ def flux_dev_from_tau_ring(tau, period, a, b, r, f, theta, ring_in, ring_out,
     kh = pc[-2:] if ecc else [None, None]
     w2d = (None if basis else
            _canon_w(u, n, law.n_w, tau2d.dtype, law.name))
-    out = _tau_graph(tau2d, *pc[:10], w2d, exp_time, mode, n_gl, n_sub, law,
-                     basis=basis, k=kh[0], h=kh[1], ew=ew)
+    if (use_metal and tau2d.dtype == mx.float32 and M._gpu_stream_active()
+            and M.metal_available()):
+        from .metal_rings import flux_dev_from_tau_ring_kernel
+        out = flux_dev_from_tau_ring_kernel(
+            tau2d, *pc[:10], w2d, exp_time, mode, n_gl, n_sub, law,
+            basis=basis, k=kh[0], h=kh[1], ew=ew)
+    else:
+        out = _tau_graph(tau2d, *pc[:10], w2d, exp_time, mode, n_gl, n_sub, law,
+                         basis=basis, k=kh[0], h=kh[1], ew=ew)
     ok = _ring_ok(*pc[3:5], *pc[6:10])[:, None]
     out = mx.where(ok[..., None] if basis else ok, out, mx.nan)
     return out[0] if squeeze and n == 1 else out

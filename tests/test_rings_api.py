@@ -207,3 +207,32 @@ def test_theta_alone_is_allowed_with_a_ring():
     """theta orients the ring of a spherical planet (no f needed)."""
     p = P(f=None, theta=60.0)
     assert 1.0 - el.TransitModel(p, T).light_curve(p).min() > 1e-3
+
+
+def test_oblate_and_spherical_models_never_touch_the_ring_code():
+    """The ring model may cost more; the oblate and spherical models must
+    not pay for it: building and running them (fp64 graph, fp32, contact
+    rule, flux_dev_from_tau) imports none of the ring modules."""
+    import subprocess
+    import sys
+    code = r'''
+import sys, math, numpy as np, mlx.core as mx
+import elome as el
+t = 0.3 + np.linspace(-0.15, 0.15, 31)
+for f in (None, 0.3):
+    p = el.TransitParams()
+    p.t0, p.per, p.rp, p.a, p.inc = 0.3, 3.45, 0.1, 8.8, 88.0
+    p.limb_dark, p.u = "hybrid5", [0.2, 0.2, 0.1, 0.1, 0.1]
+    p.f, p.theta = f, (None if f is None else 30.0)
+    for dt in (mx.float64, mx.float32):
+        for kw in ({}, {"integration": "contact", "exp_time": 0.02}):
+            el.TransitModel(p, t, dtype=dt, **kw).light_curve(p)
+el.flux_dev_from_tau(np.linspace(-0.1, 0.1, 9), 3.45, 8.8, 0.3, 0.1,
+                     limb_dark="hybrid4", u=[0.2, 0.2, 0.1, 0.1], f=0.2, theta=0.4)
+bad = [m for m in ("elome.rings", "elome.rings_tau", "elome.metal_rings") if m in sys.modules]
+print("IMPORTED:" + ",".join(bad))
+'''
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                         timeout=600)
+    assert out.returncode == 0, out.stderr[-2000:]
+    assert "IMPORTED:\n" in out.stdout or out.stdout.strip().endswith("IMPORTED:"), out.stdout
